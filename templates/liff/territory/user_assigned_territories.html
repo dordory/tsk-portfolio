@@ -1,0 +1,62 @@
+{% extends "liff/base.html" %}
+{% load tz %}
+
+{% block title %}내 구역{% endblock %}
+
+{% block content %}
+<h1 class="text-lg font-bold text-gray-900 mb-3">🗂️ 할당된 구역</h1>
+
+{% if territories %}
+<div class="space-y-3">
+    {% for territory in territories %}
+    <a href="{% url 'territory:user_territory_detail' territory.id %}"
+       class="block rounded-2xl shadow-sm border p-4
+        {% if territory.visit_status == 'today' %}bg-green-50 border-green-200
+        {% elif territory.visit_status == 'old' %}bg-red-50 border-red-200
+        {% elif territory.visit_status == 'warning' %}bg-orange-50 border-orange-200
+        {% else %}bg-white border-gray-100{% endif %}">
+        <p class="text-base font-bold text-blue-800">{{ territory.address1 }} {{ territory.address2 }}</p>
+        {% if territory.address_detail %}
+        <p class="text-sm text-gray-700">{{ territory.address_detail }}</p>
+        {% endif %}
+        {% if territory.note %}
+        <p class="mt-1 text-xs text-gray-500">메모: {{ territory.note }}</p>
+        {% endif %}
+        {% if territory.last_visited_at %}
+        <p class="mt-2 text-[11px] text-gray-500">🕒 지난 방문: {{ territory.last_visited_at|timezone:"Asia/Tokyo"|date:"n/j H:i" }}</p>
+        {% else %}
+        <p class="mt-2 text-[11px] text-gray-400">📭 방문 기록 없음</p>
+        {% endif %}
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-center text-gray-400 text-sm py-6">할당된 구역이 없습니다.</p>
+{% endif %}
+
+<h2 class="text-lg font-bold text-gray-900 mt-6 mb-3">🔒 개인 구역</h2>
+{% if private_territories %}
+<div class="space-y-3">
+    {% for territory in private_territories %}
+    <a href="{% url 'territory:user_territory_detail' territory.id %}"
+       class="block rounded-2xl shadow-sm border p-4
+        {% if territory.visit_status == 'today' %}bg-green-50 border-green-200
+        {% elif territory.visit_status == 'old' %}bg-red-50 border-red-200
+        {% elif territory.visit_status == 'warning' %}bg-orange-50 border-orange-200
+        {% else %}bg-white border-gray-100{% endif %}">
+        <p class="text-base font-bold text-blue-800">{{ territory.address1 }} {{ territory.address2 }}</p>
+        {% if territory.address_detail %}
+        <p class="text-sm text-gray-700">{{ territory.address_detail }}</p>
+        {% endif %}
+        {% if territory.last_visited_at %}
+        <p class="mt-2 text-[11px] text-gray-500">🕒 지난 방문: {{ territory.last_visited_at|timezone:"Asia/Tokyo"|date:"n/j H:i" }}</p>
+        {% else %}
+        <p class="mt-2 text-[11px] text-gray-400">📭 방문 기록 없음</p>
+        {% endif %}
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-center text-gray-400 text-sm py-6">등록된 개인 구역이 없습니다.</p>
+{% endif %}
+{% endblock %}

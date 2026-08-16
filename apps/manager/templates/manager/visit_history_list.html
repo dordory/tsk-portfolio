@@ -1,0 +1,71 @@
+{% extends "base_with_tailwind.html" %}
+{% load tz %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-6">
+  <h2 class="text-2xl font-bold mb-4">📋 방문 기록 조회</h2>
+
+  <!-- 필터 폼 -->
+  <form method="get" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div>
+      <label class="block text-sm font-medium text-gray-700">From</label>
+      <input type="date" name="from" value="{{ from_date }}"
+             class="border rounded px-2 py-1 shadow-sm w-full" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700">To</label>
+      <input type="date" name="to" value="{{ to_date }}"
+             class="border rounded px-2 py-1 shadow-sm w-full" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700">회중</label>
+      <select name="congregation" class="border rounded px-2 py-1 shadow-sm w-full">
+        <option value="">전체</option>
+        {% for c in congregations %}
+          <option value="{{ c.id }}" {% if c.id|stringformat:"s" == selected_congregation %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700">담당자</label>
+      <select name="visitor" class="border rounded px-2 py-1 shadow-sm w-full">
+        <option value="">전체</option>
+        {% for v in visitors %}
+          <option value="{{ v.id }}" {% if v.id|stringformat:"s" == selected_visitor %}selected{% endif %}>{{ v.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="self-end">
+      <button type="submit"
+              class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition w-full">
+        🔍 조회
+      </button>
+    </div>
+  </form>
+
+  <!-- 방문 기록 리스트 -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% for visit in visits %}
+      <div class="bg-white border rounded-lg shadow p-4">
+        <div class="font-semibold text-blue-800 mb-1">
+          {{ visit.territory.name }} ({{ visit.territory.code }})
+        </div>
+        <div class="text-sm text-gray-600">
+          {% timezone "Asia/Tokyo" %}
+            🗓️ {{ visit.visited_at|date:"Y년 m월 d일 H:i:s" }}
+          {% endtimezone %}
+          <br>
+          🙋 봉사장: {{ visit.visitor.name }}
+        </div>
+        {% if visit.memo %}
+          <div class="text-sm text-gray-700 mt-2">
+            📌 {{ visit.memo }}
+          </div>
+        {% endif %}
+      </div>
+    {% empty %}
+      <p class="text-gray-500">조건에 해당하는 방문 기록이 없습니다.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

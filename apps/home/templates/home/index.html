@@ -1,0 +1,69 @@
+{% extends "base_with_tailwind.html" %}
+{% block title %}홈{% endblock %}
+{% block header %}🏠 홈{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+  {% if user.is_authenticated %}
+  <p class="text-sm text-gray-500 mb-4 text-center">
+    👤 <strong>{{ user.name|default:user.username }}</strong> 님으로 로그인 중
+  </p>
+  {% else %}
+  <p class="text-sm text-gray-400 mb-4 text-center">로그인되어 있지 않습니다</p>
+  {% endif %}
+
+  <ul class="space-y-3">
+    <li>
+      <a href="{% url 'territory_cards:card_list' %}"
+         class="block bg-white rounded-xl shadow p-4 active:bg-gray-50 transition flex items-center justify-between">
+        <div class="min-w-0 flex items-center gap-3">
+          <span class="text-2xl shrink-0">🗂️</span>
+          <p class="font-semibold text-blue-800">구역카드 목록</p>
+        </div>
+        <span class="text-gray-400 text-xl ml-3">›</span>
+      </a>
+    </li>
+    <li>
+      <a href="{% url 'board:file_list' %}"
+         class="block bg-white rounded-xl shadow p-4 active:bg-gray-50 transition flex items-center justify-between">
+        <div class="min-w-0 flex items-center gap-3">
+          <span class="text-2xl shrink-0">📌</span>
+          <p class="font-semibold text-blue-800">회중게시판</p>
+        </div>
+        <span class="text-gray-400 text-xl ml-3">›</span>
+      </a>
+    </li>
+  </ul>
+
+  {# ── 테스트용 스위치 ── #}
+  <p class="text-xs text-gray-400 mt-8 mb-2">테스트용</p>
+  <ul class="space-y-3">
+    <li>
+      <a href="{% url 'territory:user_logout' %}"
+         class="block bg-white rounded-xl shadow p-4 active:bg-gray-50 transition flex items-center justify-between">
+        <div class="min-w-0 flex items-center gap-3">
+          <span class="text-2xl shrink-0">🚪</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-700">로그아웃</p>
+            <p class="text-xs text-gray-500 mt-1">서버 세션을 지웁니다 (온보딩 재테스트용)</p>
+          </div>
+        </div>
+        <span class="text-gray-400 text-xl ml-3">›</span>
+      </a>
+    </li>
+    <li>
+      <a href="{% url 'line:entry' %}?reauth=1"
+         class="block bg-white rounded-xl shadow p-4 active:bg-gray-50 transition flex items-center justify-between">
+        <div class="min-w-0 flex items-center gap-3">
+          <span class="text-2xl shrink-0">♻️</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-700">LINE 재인증</p>
+            <p class="text-xs text-gray-500 mt-1">캐시된 토큰을 버리고 최신 LINE 프로필로 다시 받습니다</p>
+          </div>
+        </div>
+        <span class="text-gray-400 text-xl ml-3">›</span>
+      </a>
+    </li>
+  </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base_with_tailwind.html" %}
+
+{% block title %}본인 확인{% endblock %}
+{% block header %}🔑 본인 확인{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+  <div class="bg-white rounded-xl shadow p-6 space-y-4">
+    <div class="text-center">
+      <p class="text-3xl mb-2">🔑</p>
+      <h2 class="text-lg font-bold text-gray-800">{{ member.name }} 님이 맞나요?</h2>
+      <p class="text-sm text-gray-600 mt-2">
+        관리자에게 받은 <strong>초대코드 6자리</strong>를 입력하면 LINE 계정이 연결됩니다.
+      </p>
+    </div>
+
+    {% if error %}
+    <p class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+      {{ error }}
+    </p>
+    {% endif %}
+
+    <form method="post" action="{% url 'territory:link_member' %}" class="space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="member_id" value="{{ member.id }}">
+      <input type="text" name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+             autocomplete="one-time-code" autofocus required
+             placeholder="123456"
+             class="w-full text-center text-2xl tracking-[0.5em] font-mono border border-gray-300 rounded-lg p-3
+                    focus:outline-none focus:ring-2 focus:ring-emerald-400">
+      <button type="submit"
+              class="w-full bg-emerald-600 text-white font-bold rounded-lg p-3 active:bg-emerald-700 transition">
+        연결하기
+      </button>
+    </form>
+
+    <p class="text-center">
+      <a href="{% url 'territory:user_groups' %}" class="text-sm text-gray-400 underline">다른 이름 선택</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

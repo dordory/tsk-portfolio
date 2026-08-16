@@ -1,0 +1,116 @@
+{% extends "base_with_tailwind.html" %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto pt-6 pb-20 px-4 relative">
+
+  <!-- 돌아가기 버튼 (고정) -->
+  <a href="{% url 'territory_manager:deck_list' %}"
+     class="fixed top-6 right-6 bg-blue-600 text-white text-sm px-3 py-1.5 rounded-full shadow-lg hover:bg-blue-700 transition z-50">
+    <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" stroke-width="2"
+         viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
+    </svg>
+    돌아가기
+  </a>
+
+  <!-- 상단 고정 헤더 -->
+  <div class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200 px-1 py-3 mb-4">
+    <h2 class="text-xl font-bold text-gray-800">📦 {{ selected_deck.name }} - 구역 할당</h2>
+  </div>
+
+  {% if territories %}
+    <form method="POST" id="assignForm" class="space-y-6">
+      {% csrf_token %}
+
+      <!-- 담당자 선택 -->
+      <div class="flex items-center gap-x-4">
+        <label for="member" class="text-gray-700 font-medium whitespace-nowrap">👤 담당자 선택</label>
+        <select name="member" id="member"
+                class="w-full max-w-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+          <option value="">-- 선택하세요 --</option>
+          {% for m in members %}
+          <option value="{{ m.id }}">{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Territory 카드 리스트 -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {% for t in territories %}
+        <label class="cursor-pointer relative block">
+          <input type="checkbox" name="territory_ids" value="{{ t.id }}" class="hidden peer">
+          <div class="rounded-2xl p-4 border transition shadow-sm
+            hover:shadow-md
+            peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:border-blue-500
+            {% if t.visit_status == 'old' %}
+              bg-red-50 border-red-300
+            {% elif t.visit_status == 'warning' %}
+              bg-yellow-50 border-yellow-300
+            {% else %}
+              bg-emerald-50 border-emerald-300
+            {% endif %}">
+
+            <!-- 체크 아이콘 -->
+            <svg class="w-6 h-6 text-blue-600 absolute top-2 right-2 hidden peer-checked:block"
+                 xmlns="http://www.w3.org/2000/svg"
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M5 13l4 4L19 7" />
+            </svg>
+
+            <!-- 주소 및 방문정보 -->
+            <div class="space-y-1 text-sm text-gray-800">
+              <div class="font-semibold text-blue-700 truncate">({{ t.code }}) {{ t.address1 }} {{ t.address2 }}</div>
+              <div class="text-xs text-gray-500">
+                {% if t.last_visit %}
+                  🕒 마지막 방문: {{ t.last_visit.visited_at|date:"Y년 m월 d일" }}
+                {% else %}
+                  📭 방문 기록 없음
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+
+      <!-- 하단 고정 바 -->
+      <div id="bottomBar" class="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 shadow-md p-4 flex justify-between items-center hidden z-40">
+        <div class="text-sm text-gray-700">
+          ✅ <span id="selectedCount">0</span>개 구역 선택됨
+        </div>
+        <button type="submit"
+                id="submitButton"
+                disabled
+                class="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
+          🚀 할당하기
+        </button>
+      </div>
+    </form>
+  {% else %}
+    <p class="text-sm text-gray-500 mt-6">할당 가능한 구역이 없습니다.</p>
+  {% endif %}
+</div>
+
+<!-- ✅ 개선된 JavaScript -->
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const checkboxes = document.querySelectorAll('input[name="territory_ids"]');
+    const bottomBar = document.getElementById('bottomBar');
+    const selectedCount = document.getElementById('selectedCount');
+    const memberSelect = document.getElementById('member');
+    const submitButton = document.getElementById('submitButton');
+
+    function updateButtonState() {
+      const selected = document.querySelectorAll('input[name="territory_ids"]:checked');
+      const memberSelected = memberSelect.value !== "";
+      selectedCount.textContent = selected.length;
+      bottomBar.classList.toggle('hidden', selected.length === 0);
+      submitButton.disabled = !(selected.length > 0 && memberSelected);
+    }
+
+    checkboxes.forEach(cb => cb.addEventListener('change', updateButtonState));
+    memberSelect.addEventListener('change', updateButtonState);
+  });
+</script>
+{% endblock %}

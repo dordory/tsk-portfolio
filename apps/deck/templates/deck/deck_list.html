@@ -1,0 +1,34 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Deck 목록</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4 sm:p-6">
+  <div class="max-w-7xl mx-auto">
+    <h2 class="text-2xl font-bold mb-6 text-gray-800">📦 Deck 목록</h2>
+
+    <div class="grid grid-cols-3 gap-4
+                sm:grid-cols-1
+                md:grid-cols-2
+                lg:grid-cols-3">
+      {% for deck in decks %}
+        <a href="{% url 'deck:assign_territories_to_deck' deck.id %}"
+           class="border border-gray-200 rounded-xl shadow p-5 hover:shadow-md transition
+           {% if deck.territories.count == 0 %} bg-red-200
+           {% elif deck.territories.count <= 30 %} bg-amber-100
+           {% else %} bg-lime-100
+           {% endif %}">
+          <h3 class="text-lg font-semibold text-blue-800 break-words">{{ deck.name }}</h3>
+          <p class="text-sm text-gray-600 mt-1">구역 수: {{ deck.territories.count }}</p>
+        </a>
+      {% empty %}
+        <p class="text-gray-500 col-span-full text-center">등록된 Deck이 없습니다.</p>
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>

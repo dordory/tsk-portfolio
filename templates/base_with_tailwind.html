@@ -1,0 +1,93 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Territory Manager{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- ✅ LIFF SDK (LINE MINI App) -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <!-- ✅ Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- ✅ Tailwind config (safelist + custom colors 를 한 번에 선언) -->
+  <script>
+    tailwind.config = {
+      safelist: [
+        'peer',
+        'peer-checked:block',
+        'hidden',
+        'block',
+        'absolute',
+        'ring-2',
+        'ring-blue-500',
+        'border-blue-600',
+        'bg-red-100',
+        'bg-orange-100',
+        'bg-emerald-100',
+        'border-red-300',
+        'border-orange-300',
+        'border-emerald-300',
+        'text-blue-800',
+        'text-blue-600',
+        // territory_cards 방문상태 색 (mapping.STATUS_COLORS 와 동기화)
+        'bg-emerald-100', 'border-emerald-300', 'text-emerald-800',
+        'bg-lime-100', 'border-lime-300', 'text-lime-800',
+        'bg-amber-100', 'border-amber-300', 'text-amber-800',
+        'bg-gray-100', 'bg-gray-200', 'border-gray-300', 'text-gray-700',
+        'bg-pink-100', 'border-pink-300', 'text-pink-800',
+        'bg-blue-100', 'border-blue-300', 'text-blue-800',
+        'bg-red-100', 'border-red-300', 'text-red-800',
+        'bg-teal-100', 'border-teal-300', 'text-teal-800',
+        'bg-purple-100', 'border-purple-300', 'text-purple-800',
+        'bg-indigo-100', 'border-indigo-300', 'text-indigo-800',
+        // territory_cards 탭 타일 (mapping.VISIT_RECENCY_COLORS + 배정 타일 흐림 + J2 두 줄 표시)
+        'border', 'opacity-60', 'line-clamp-2', 'break-all', 'leading-tight'
+      ],
+      theme: {
+        extend: {
+          colors: {
+            ivory: '#fdfaf6',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- ✅ Alpine.js (선택 사항) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+  <!-- ✅ Header -->
+  <header class="bg-white shadow">
+    <div class="max-w-7xl text-center px-4 py-4 sm:px-6 lg:px-8">
+      <h1 class="text-xl font-bold text-gray-800">{% block header %}📍 {{ congregation_name }} 구역관리 {% endblock %}</h1>
+    </div>
+  </header>
+
+  <!-- ✅ Main Content -->
+  <main class="flex-grow">
+    <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 bg-sky-50 rounded-xl">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <!-- ✅ Footer -->
+  <footer class="bg-gray-200 text-center text-sm text-gray-600 py-4">
+    &copy; {{ now.year }} {{ congregation_name }} 구역관리 시스템
+  </footer>
+
+  <script>
+    // 스와이프 백 등으로 bfcache 에서 복원된 페이지는 서버 요청 없이 옛 DOM 이
+    // 그대로 보인다(방금 기록한 방문이 목록에 반영 안 됨). 복원 감지 시 새로고침.
+    window.addEventListener('pageshow', function (e) {
+      if (e.persisted) location.reload();
+    });
+  </script>
+</body>
+</html>

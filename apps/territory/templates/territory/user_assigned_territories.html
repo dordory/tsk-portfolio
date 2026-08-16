@@ -1,0 +1,183 @@
+{% load static %}
+{% load tz %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>할당된 구역 목록</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.css" />
+  <style>
+    .swiper-button-prev::after,
+    .swiper-button-next::after {
+      display: none;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 p-2">
+
+<!-- 🗂️ 할당된 구역 목록 -->
+<div class="bg-white shadow rounded-lg p-2">
+  <h2 class="text-2xl font-bold mb-6 text-gray-800">🗂️ 할당된 구역 목록</h2>
+
+  {% if territories %}
+  <div class="swiper mySwiper relative">
+    <div class="swiper-wrapper">
+      {% for territory in territories %}
+      <div class="swiper-slide">
+        <div class="rounded shadow p-4 flex flex-col justify-between h-full
+          {% if territory.visit_status == 'today' %}bg-green-100 border border-green-300
+          {% elif territory.visit_status == 'old' %}bg-red-100 border border-red-300
+          {% elif territory.visit_status == 'warning' %}bg-orange-100 border border-orange-300
+          {% else %}bg-amber-50{% endif %}">
+          <h3 class="text-lg font-bold text-blue-800 mb-1">{{ territory.address1 }} {{ territory.address2 }}</h3>
+          <h3 class="text-lg font-bold text-blue-800 mb-1">{{ territory.address_detail }}</h3>
+          <p class="text-sm text-gray-600">메모: {{ territory.note }}</p>
+          {% if territory.last_visited_at %}
+          <p class="mt-2 text-xs text-gray-500">🕒 지난 방문: {{ territory.last_visited_at|timezone:"Asia/Tokyo"|date:"Y년m월d일 H시i분" }}</p>
+          {% else %}
+          <p class="mt-2 text-xs text-gray-400">📭 방문 기록 없음</p>
+          {% endif %}
+          {% if territory.assigned_to %}
+          <p class="mt-2 text-xs text-gray-500">🕒 임명된 봉사자: {{ territory.assigned_to }}</p>
+          {% else %}
+          <p class="mt-2 text-xs text-gray-400">📭 임명된 봉사자 없음</p>
+          {% endif %}
+          <div class="mt-4 flex justify-between items-center pt-4 border-t">
+            <a href="{{ territory.map_link }}" target="_blank"
+               class="inline-flex items-center space-x-1 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition whitespace-nowrap">
+              지도
+            </a>
+            <a href="{% url 'territory:user_territory_detail' territory.id %}"
+               class="inline-flex items-center space-x-1 px-3 py-1 bg-gray-700 text-white text-sm rounded hover:bg-gray-800 transition whitespace-nowrap">
+              자세히 보기
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="swiper-button-prev !w-7 !h-7 flex items-center justify-center text-gray-700 bg-white/90 rounded-full shadow-md hover:bg-white absolute top-1/2 -left-4 z-10 cursor-pointer transition duration-150"></div>
+    <div class="swiper-button-next !w-7 !h-7 flex items-center justify-center text-gray-700 bg-white/90 rounded-full shadow-md hover:bg-white absolute top-1/2 -right-4 z-10 cursor-pointer transition duration-150"></div>
+    <div class="swiper-pagination mt-4 mb-2"></div>
+    <div id="swiper-page-info" class="text-sm text-center text-gray-600 mb-1"></div>
+  </div>
+  {% else %}
+  <p class="text-center text-gray-500">등록된 구역이 없습니다.</p>
+  {% endif %}
+</div>
+
+
+<!-- 🔒 개인 구역 목록 -->
+<div class="bg-white shadow rounded-lg p-2 mt-4">
+  <h2 class="text-2xl font-bold mb-6 text-gray-800">🔒 개인 구역 목록</h2>
+
+  {% if private_territories %}
+  <div class="swiper myPrivateSwiper relative">
+    <div class="swiper-wrapper">
+      {% for territory in private_territories %}
+      <div class="swiper-slide">
+        <div class="rounded shadow p-4 flex flex-col justify-between h-full
+          {% if territory.visit_status == 'today' %}bg-green-100 border border-green-300
+          {% elif territory.visit_status == 'old' %}bg-red-100 border border-red-300
+          {% elif territory.visit_status == 'warning' %}bg-orange-100 border border-orange-300
+          {% else %}bg-amber-50{% endif %}">
+          <h3 class="text-lg font-bold text-blue-800 mb-1">{{ territory.address1 }} {{ territory.address2 }}</h3>
+          <h3 class="text-lg font-bold text-blue-800 mb-1">{{ territory.address_detail }}</h3>
+          <p class="text-sm text-gray-600">메모: {{ territory.note }}</p>
+          {% if territory.last_visited_at %}
+          <p class="mt-2 text-xs text-gray-500">🕒 지난 방문: {{ territory.last_visited_at|timezone:"Asia/Tokyo"|date:"Y년m월d일 H시i분" }}</p>
+          {% else %}
+          <p class="mt-2 text-xs text-gray-400">📭 방문 기록 없음</p>
+          {% endif %}
+          {% if territory.private_assigned_to %}
+          <p class="mt-2 text-xs text-gray-500">🕒 개인구역 봉사자: {{ territory.private_assigned_to }}</p>
+          {% else %}
+          <p class="mt-2 text-xs text-gray-400">📭 임명된 봉사자 없음</p>
+          {% endif %}
+          <div class="mt-4 flex justify-between items-center pt-4 border-t">
+            <a href="{{ territory.map_link }}" target="_blank"
+               class="inline-flex items-center space-x-1 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition whitespace-nowrap">
+              지도
+            </a>
+            <a href="{% url 'territory:user_territory_detail' territory.id %}"
+               class="inline-flex items-center space-x-1 px-3 py-1 bg-gray-700 text-white text-sm rounded hover:bg-gray-800 transition whitespace-nowrap">
+              자세히 보기
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="swiper-button-prev private-prev !w-7 !h-7 flex items-center justify-center text-gray-700 bg-white/90 rounded-full shadow-md hover:bg-white absolute top-1/2 -left-4 z-10 cursor-pointer transition duration-150"></div>
+    <div class="swiper-button-next private-next !w-7 !h-7 flex items-center justify-center text-gray-700 bg-white/90 rounded-full shadow-md hover:bg-white absolute top-1/2 -right-4 z-10 cursor-pointer transition duration-150"></div>
+    <div class="swiper-pagination private-pagination mt-4 mb-2"></div>
+    <div id="private-swiper-page-info" class="text-sm text-center text-gray-600 mb-1"></div>
+  </div>
+  {% else %}
+  <p class="text-center text-gray-500">등록된 개인 구역이 없습니다.</p>
+  {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.js"></script>
+<script>
+  const swiper = new Swiper('.mySwiper', {
+    slidesPerView: 1,
+    spaceBetween: 16,
+    navigation: {
+      nextEl: '.swiper-button-next',
+      prevEl: '.swiper-button-prev',
+    },
+    pagination: {
+      el: '.swiper-pagination',
+      clickable: true,
+    },
+    breakpoints: {
+      640: { slidesPerView: 2 },
+      768: { slidesPerView: 3 },
+      1024: { slidesPerView: 4 },
+    },
+    on: {
+      init: updatePageInfo,
+      slideChange: updatePageInfo
+    }
+  });
+
+  function updatePageInfo(swiper) {
+    const total = Math.ceil(swiper.slides.length / swiper.params.slidesPerView);
+    const current = Math.ceil((swiper.activeIndex + 1) / swiper.params.slidesPerView);
+    document.getElementById('swiper-page-info').textContent = `${current} / ${total}`;
+  }
+
+  const privateSwiper = new Swiper('.myPrivateSwiper', {
+    slidesPerView: 1,
+    spaceBetween: 16,
+    navigation: {
+      nextEl: '.private-next',
+      prevEl: '.private-prev',
+    },
+    pagination: {
+      el: '.private-pagination',
+      clickable: true,
+    },
+    breakpoints: {
+      640: { slidesPerView: 2 },
+      768: { slidesPerView: 3 },
+      1024: { slidesPerView: 4 },
+    },
+    on: {
+      init: updatePrivatePageInfo,
+      slideChange: updatePrivatePageInfo
+    }
+  });
+
+  function updatePrivatePageInfo(swiper) {
+    const total = Math.ceil(swiper.slides.length / swiper.params.slidesPerView);
+    const current = Math.ceil((swiper.activeIndex + 1) / swiper.params.slidesPerView);
+    document.getElementById('private-swiper-page-info').textContent = `${current} / ${total}`;
+  }
+</script>
+
+</body>
+</html>

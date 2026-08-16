@@ -1,0 +1,173 @@
+{% extends "base_with_tailwind.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-6 relative">
+  <!-- deck_list로 돌아가기 링크 -->
+  <a href="{% url 'deck:deck_list' %}"
+      class="fixed top-25 right-5 mt-2 mr-2 bg-blue-600 text-white text-sm px-3 py-1.5 rounded-full shadow-lg hover:bg-blue-700 transition z-50">
+      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" stroke-width="2"
+          viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
+    </svg>
+  </a>
+
+  <h2 class="text-2xl font-bold mb-6">📦 {{ selected_deck.name }} 봉사구역 할당하기</h2>
+
+  <!-- Deck에 포함되어 있는 구역리스트를 표시 시작 -->
+  <form method="POST" action="{% url 'deck:remove_territories_from_deck' selected_deck.id %}">
+    {% csrf_token %}
+    <div class="mb-6 border border-gray-300 rounded-lg p-4 shadow-sm bg-white">
+      <div class="flex justify-between items-center mb-3">
+        <p class="text-lg font-semibold mb-2">{{ selected_deck.name }} 봉사구역 ({{ deck_territories.count }}건)</p>
+        {% if deck_territories %}
+        <button type="submit" class="mt-2 px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700">
+          ❌ 선택 제거
+        </button>
+        {% endif %}
+      </div>
+
+      {% if deck_territories %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-80 overflow-y-auto">
+        {% for t in deck_territories %}
+        <label class="cursor-pointer relative block">
+          <input type="checkbox" name="remove_territory_ids" value="{{ t.id }}" class="hidden peer">
+
+          <div class="min-h-[70px] rounded shadow p-4 flex flex-col justify-between transition
+            {% if t.visit_status == 'old' %}
+              bg-red-100 border border-red-300
+            {% elif t.visit_status == 'warning' %}
+              bg-orange-100 border border-orange-300
+            {% else %}
+              bg-emerald-100 border border-emerald-300
+            {% endif %}
+            peer-checked:ring-2 peer-checked:ring-blue-400 peer-checked:border-blue-500">
+
+            <svg class="w-6 h-6 text-blue-600 absolute top-2 right-2 hidden peer-checked:block"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M5 13l4 4L19 7" />
+            </svg>
+
+            <div class="text-sm text-gray-800 leading-tight">
+              <div class="font-medium text-blue-800">({{ t.code }}) {{ t.address1 }} {{ t.address2 }}</div>
+              {% if t.last_visit %}
+              <div class="text-gray-500 text-xs mt-1">🕒 마지막 방문: {{ t.last_visit.visited_at|date:"Y년m월d일" }}</div>
+              {% else %}
+              <div class="text-gray-400 text-xs mt-1">📭 방문 기록 없음</div>
+              {% endif %}
+            </div>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+      {% else %}
+        <p class="text-sm text-gray-500">현재 포함된 Territory가 없습니다.</p>
+      {% endif %}
+    </div>
+  </form>
+  <!-- Deck에 포함되어 있는 구역리스트를 표시 끝 -->
+
+  <!-- Deck에 포함시킬 구역 데이터 푯시 시작  -->
+  <div class="mb-6 border border-gray-300 rounded-lg p-4 shadow-sm bg-white">
+    <!-- Dock에 구역을 추가하기 위한 회중 선택 드롭다운 시작 -->
+    <form method="GET" class="mb-6">
+      <div class="flex items-center gap-x-4">
+        <label for="cong" class="text-gray-700 font-medium whitespace-nowrap">구역 선택</label>
+        <select name="congregation" id="cong"
+                class="w-full max-w-xs border-gray-300 rounded-lg shadow-sm"
+                onchange="this.form.submit()">
+          <option value="">-- 선택하세요 --</option>
+          {% for c in congregations %}
+          <option value="{{ c.id }}" {% if selected_cong and c.id == selected_cong.id %}selected{% endif %}>
+            {{ c.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+    <!-- Dock에 구역을 추가하기 위한 회중 선택 드롭다운 끝 -->
+
+    <!-- 선택된 회중에 속한 구역 데이터 표시 시작 -->
+    {% if territories %}
+      <form method="POST" class="space-y-4">
+        {% csrf_token %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {% for t in territories %}
+          <label class="cursor-pointer relative block">
+            <input type="checkbox" name="territory_ids" value="{{ t.id }}" class="hidden peer">
+
+            <div class="min-h-[70px] rounded shadow p-4 flex flex-col justify-between transition
+              {% if t.visit_status == 'old' %}
+                bg-red-100 border border-red-300
+              {% elif t.visit_status == 'warning' %}
+                bg-orange-100 border border-orange-300
+              {% else %}
+                bg-emerald-100 border border-emerald-300
+              {% endif %}
+              peer-checked:ring-2 peer-checked:ring-blue-400 peer-checked:border-blue-500">
+
+              <svg class="w-6 h-6 text-blue-600 absolute top-2 right-2 hidden peer-checked:block"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M5 13l4 4L19 7" />
+              </svg>
+
+              <div class="text-sm text-gray-800 leading-tight">
+                <div class="font-medium text-blue-800">({{ t.code }}) {{ t.address1 }} {{ t.address2 }}</div>
+                {% if t.last_visit %}
+                  <div class="text-gray-500 text-xs mt-1">🕒 마지막 방문: {{ t.last_visit.visited_at|date:"Y년m월d일" }}</div>
+                {% else %}
+                  <div class="text-gray-400 text-xs mt-1">📭 방문 기록 없음</div>
+                {% endif %}
+              </div>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+
+        <!-- 선택된 구역 고정 표시 바 시작 -->
+        <input type="hidden" name="deck_id" value="{{ selected_deck.id }}">
+        <div id="selectedBar"
+            class="fixed bottom-0 left-0 w-full bg-blue-600 text-white px-4 py-3 flex items-center justify-between shadow-lg transition transform translate-y-full"
+            style="z-index: 50;">
+          <div class="text-sm">
+            ✅ 선택된 구역: <span id="selectedCount">0</span>개
+          </div>
+          <button type="submit" class="bg-white text-blue-600 px-4 py-1.5 rounded font-semibold hover:bg-gray-100">
+            🚀 할당하기
+          </button>
+        </div>
+        <!-- 선택된 구역 고정 표시 바 끝 -->
+      </form>
+    {% elif selected_cong %}
+      <p class="text-sm text-gray-500 mt-4">해당 그룹에 할당 가능한 구역이 없습니다.</p>
+    {% endif %}
+    <!-- 선택된 회중에 속한 구역 데이터 표시 끝 -->
+  </div>
+  <!-- Deck에 포함시킬 구역 데이터 푯시 끝  -->
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const checkboxes = document.querySelectorAll('input[name="territory_ids"]');
+    const selectedBar = document.getElementById('selectedBar');
+    const selectedCount = document.getElementById('selectedCount');
+
+    function updateBar() {
+      const count = Array.from(checkboxes).filter(cb => cb.checked).length;
+      if (count > 0) {
+        selectedCount.textContent = count;
+        selectedBar.classList.remove('translate-y-full');
+        selectedBar.classList.add('translate-y-0');
+      } else {
+        selectedBar.classList.add('translate-y-full');
+        selectedBar.classList.remove('translate-y-0');
+      }
+    }
+
+    checkboxes.forEach(cb => cb.addEventListener('change', updateBar));
+  });
+</script>
+{% endblock %}

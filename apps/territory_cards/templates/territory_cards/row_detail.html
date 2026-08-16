@@ -1,0 +1,247 @@
+{% extends "base_with_tailwind.html" %}
+{% load cards %}
+{% block title %}방문기록{% endblock %}
+{% block header %}🏠 방문기록{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto"
+     x-data="rowDetail({
+        noteUrl: '{% url 'territory_cards:save_note' card.spreadsheet_id gid row.row %}',
+        visitUrl: '{% url 'territory_cards:add_visit' card.spreadsheet_id gid row.row %}',
+        rowKey: `{{ row_key|escapejs }}`
+     })">
+
+  <div class="mb-4 flex items-center justify-between">
+    <a href="{% url 'territory_cards:address_list' card.spreadsheet_id gid %}{% if view_only %}?view=1{% endif %}"
+       class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg shadow-md hover:bg-indigo-700 active:scale-95 transition">
+      <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
+      </svg>
+      주소 목록으로
+    </a>
+
+    {% if view_only %}
+    <span class="px-2 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700 font-medium">👁 열람 모드</span>
+    {% endif %}
+  </div>
+
+  <!-- 기본 정보 -->
+  <div class="bg-white rounded-xl shadow p-4 space-y-2">
+    {# 지역명(A열) + 번지. 예: サンプル区見本町1-1-3 #}
+    <h2 class="text-lg font-bold text-blue-800">{{ row.address }}</h2>
+    {% if row.bldg %}<p class="text-gray-800">{{ row.bldg }}</p>{% endif %}
+
+    <div class="flex items-center gap-4 pt-1 text-sm">
+      {% if row.phone %}
+      <a href="tel:{{ row.phone }}" class="text-gray-600">📞 {{ row.phone }}</a>
+      {% endif %}
+      {% if row.map_url %}
+      <a href="{% url 'territory_cards:maps_redirect' %}?u={{ row.map_url|urlencode }}"
+         data-external {% if map_app_url %}data-app-url="{{ map_app_url }}"{% endif %}
+         target="_blank" rel="noopener"
+         class="inline-flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded-lg active:bg-blue-600 transition">
+        🗺 {{ row.map_label }}
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# 메모(F열, 시트상 명칭은 '비고') — 열람 모드에서는 읽기 전용 #}
+  <div class="bg-white rounded-xl shadow p-4 mt-4">
+    <label for="note" class="block text-sm font-medium text-gray-700 mb-1">📝 메모</label>
+    {% if view_only %}
+    {% if row.note %}
+    <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ row.note }}</p>
+    {% else %}
+    <p class="text-sm text-gray-400">메모 없음</p>
+    {% endif %}
+    {% else %}
+    <textarea id="note" rows="3" x-model="note"
+              class="w-full p-2 border border-gray-300 rounded-lg text-sm"
+              placeholder="이 주소에 대한 메모"></textarea>
+    <div class="flex items-center justify-end gap-2 mt-2">
+      <span class="text-xs" :class="noteMsgClass" x-text="noteMsg"></span>
+      <button @click="saveNote()" :disabled="noteSaving"
+              class="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium active:bg-green-600 transition disabled:opacity-50">
+        <span x-text="noteSaving ? '저장 중…' : '메모저장'"></span>
+      </button>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- 방문 이력(J~O) -->
+  <div class="mt-4">
+    <h3 class="text-sm font-semibold text-gray-700 mb-2">🕓 방문 이력</h3>
+    <ul class="space-y-2" id="visit-list">
+      <template x-for="(v, i) in visits" :key="i">
+        <li class="bg-white rounded-lg shadow px-3 py-2 flex items-center justify-between border"
+            :class="v.colorClass">
+          <span class="text-sm font-medium" x-text="v.status"></span>
+          <span class="text-xs text-gray-500" x-text="v.date + ' ' + v.time"></span>
+        </li>
+      </template>
+    </ul>
+    <p x-show="visits.length === 0" class="text-gray-500 text-sm py-2">방문 기록이 없습니다.</p>
+  </div>
+
+  {# 신규 방문결과 기록 — 열람 모드에서는 숨김 #}
+  {% if not view_only %}
+  <div class="bg-white rounded-xl shadow p-4 mt-4">
+    <label for="status" class="block text-sm font-medium text-gray-700 mb-1">➕ 방문결과 기록</label>
+    <p class="text-xs text-gray-400 mb-2">상태만 선택하면 날짜·시간(JST)은 자동으로 기록됩니다.</p>
+    <div class="flex gap-2">
+      <select id="status" x-model="newStatus"
+              class="flex-grow border border-gray-300 rounded-lg p-2 text-sm">
+        <option value="">상태 선택…</option>
+        {% for opt in status_options %}
+        <option value="{{ opt }}">{{ opt }}</option>
+        {% endfor %}
+      </select>
+      <button @click="addVisit()" :disabled="visitSaving || !newStatus"
+              class="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium active:bg-blue-600 transition disabled:opacity-50 whitespace-nowrap">
+        <span x-text="visitSaving ? '기록 중…' : '기록'"></span>
+      </button>
+    </div>
+    <p class="text-xs mt-2" :class="visitMsgClass" x-text="visitMsg"></p>
+  </div>
+  {% endif %}
+
+  {# 행 지문 불일치(409) 모달 — 이 화면의 행 번호는 이미 다른 집을 가리킬 수 있으므로 #}
+  {# 새로고침 대신 주소 목록(매 요청 시트를 새로 읽음)으로 돌아가도록 유도한다. 닫기 버튼은 두지 않는다. #}
+  <div x-show="mismatchMsg" style="display:none"
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center space-y-4">
+      <p class="text-4xl">⚠️</p>
+      <h3 class="text-lg font-bold text-gray-800">저장하지 못했습니다</h3>
+      <p class="text-sm text-gray-600 leading-relaxed" x-text="mismatchMsg"></p>
+      <a href="{% url 'territory_cards:address_list' card.spreadsheet_id gid %}"
+         class="block w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold text-sm active:bg-indigo-700 shadow-md transition">
+        주소 목록으로 돌아가기
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<script>
+  // 상태색 매핑(서버 mapping.STATUS_COLORS 와 동기화). 새 기록에 색을 즉시 입히기 위해 클라이언트에도 둔다.
+  const STATUS_COLORS = {
+    "만남": "bg-emerald-100 border-emerald-300 text-emerald-800",
+    "초대장": "bg-lime-100 border-lime-300 text-lime-800",
+    "부재": "bg-amber-100 border-amber-300 text-amber-800",
+    "이사": "bg-gray-200 border-gray-300 text-gray-700",
+    "새로발견": "bg-pink-100 border-pink-300 text-pink-800",
+    "확인필요": "bg-blue-100 border-blue-300 text-blue-800",
+    "방문거부": "bg-red-100 border-red-300 text-red-800",
+    "간격방문": "bg-teal-100 border-teal-300 text-teal-800",
+    "외국인": "bg-purple-100 border-purple-300 text-purple-800",
+    "편지": "bg-indigo-100 border-indigo-300 text-indigo-800",
+  };
+  const STATUS_COLOR_DEFAULT = "bg-gray-100 border-gray-300 text-gray-700";
+  // 상태명의 괄호 주석 제거(예: '이사(引越)' → '이사') 후 색 매핑.
+  function statusBase(s) {
+    s = (s || "").trim();
+    for (const br of ["(", "（"]) { const i = s.indexOf(br); if (i !== -1) s = s.slice(0, i); }
+    return s.trim();
+  }
+  function statusColor(s) { return STATUS_COLORS[statusBase(s)] || STATUS_COLOR_DEFAULT; }
+
+  function getCookie(name) {
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m.pop()) : '';
+  }
+
+  function rowDetail(cfg) {
+    return {
+      note: `{{ row.note|escapejs }}`,
+      noteSaving: false, noteMsg: '', noteMsgClass: '',
+      visits: [
+        {% for v in visits %}
+        { status: `{{ v.status|escapejs }}`, date: `{{ v.date|escapejs }}`, time: `{{ v.time|escapejs }}`,
+          colorClass: statusColor(`{{ v.status|escapejs }}`) },
+        {% endfor %}
+      ],
+      newStatus: '', visitSaving: false, visitMsg: '', visitMsgClass: '',
+      mismatchMsg: '',   // 행 지문 불일치(409) — 값이 있으면 안내 모달 표시
+
+      async saveNote() {
+        this.noteSaving = true; this.noteMsg = '';
+        try {
+          const res = await fetch(cfg.noteUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': getCookie('csrftoken') },
+            body: new URLSearchParams({ note: this.note, row_key: cfg.rowKey }),
+          });
+          const data = await res.json();
+          if (res.ok && data.ok) { this.noteMsg = '저장됨 ✓'; this.noteMsgClass = 'text-green-600'; }
+          else if (res.status === 409) { this.mismatchMsg = data.error || '시트가 변경되어 저장하지 못했습니다.'; }
+          else { this.noteMsg = data.error || '저장 실패'; this.noteMsgClass = 'text-red-500'; }
+        } catch (e) { this.noteMsg = '네트워크 오류'; this.noteMsgClass = 'text-red-500'; }
+        finally { this.noteSaving = false; }
+      },
+
+      async addVisit() {
+        if (!this.newStatus) return;
+        this.visitSaving = true; this.visitMsg = '';
+        try {
+          const res = await fetch(cfg.visitUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': getCookie('csrftoken') },
+            body: new URLSearchParams({ status: this.newStatus, row_key: cfg.rowKey }),
+          });
+          const data = await res.json();
+          if (res.ok && data.ok && data.visit) {
+            const v = data.visit;
+            const rec = { status: v.status, date: v.date, time: v.time, colorClass: statusColor(v.status) };
+            // 6칸이 다 차면 서버가 시프트하므로, 화면도 최대 6개 유지(가장 오래된 것 제거).
+            this.visits.push(rec);
+            if (this.visits.length > 6) this.visits.shift();
+            this.newStatus = '';
+            this.visitMsg = '기록됨 ✓'; this.visitMsgClass = 'text-green-600';
+          } else if (res.status === 409) {
+            this.mismatchMsg = data.error || '시트가 변경되어 저장하지 못했습니다.';
+          } else {
+            this.visitMsg = data.error || '기록 실패'; this.visitMsgClass = 'text-red-500';
+          }
+        } catch (e) { this.visitMsg = '네트워크 오류'; this.visitMsgClass = 'text-red-500'; }
+        finally { this.visitSaving = false; }
+      },
+    };
+  }
+
+  // 지도 등 외부 링크 처리.
+  // 1) data-app-url(구글맵 앱 스킴/인텐트)이 있으면 웹뷰에서 직접 시도 —
+  //    브라우저를 거치지 않고 바로 앱으로. 1.2초 안에 앱 전환이 안 되면
+  //    기존 중계 뷰 경로(a.href)로 폴백한다.
+  // 2) 없으면 종전대로 LINE 인앱에서 liff.openWindow() 로 외부 브라우저에서 연다.
+  document.addEventListener('click', function (e) {
+    const a = e.target.closest('a[data-external]');
+    if (!a) return;
+
+    const appUrl = a.dataset.appUrl;
+    if (appUrl) {
+      e.preventDefault();
+      const fallback = setTimeout(function () {
+        if (typeof liff !== 'undefined' && liff.openWindow) {
+          liff.openWindow({ url: a.href, external: true });
+        } else {
+          window.open(a.href, '_blank', 'noopener');
+        }
+      }, 1200);
+      const cancel = function () { clearTimeout(fallback); };
+      addEventListener('pagehide', cancel, { once: true });
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) cancel();
+      }, { once: true });
+      window.location.href = appUrl;
+      return;
+    }
+
+    if (typeof liff !== 'undefined' && liff.openWindow) {
+      e.preventDefault();
+      liff.openWindow({ url: a.href, external: true });
+    }
+  });
+</script>
+{% endblock %}

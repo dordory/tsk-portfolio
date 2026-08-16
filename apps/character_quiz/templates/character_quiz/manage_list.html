@@ -1,0 +1,139 @@
+{% extends "base_with_tailwind.html" %}
+{% block title %}인물카드 관리{% endblock %}
+{% block header %}🛠 인물카드 관리{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+
+  {% if messages %}
+  <div class="space-y-2 mb-4">
+    {% for message in messages %}
+    <div class="px-4 py-2 rounded-lg text-sm border
+                {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200
+                {% elif message.tags == 'warning' %}bg-amber-50 text-amber-800 border-amber-200
+                {% else %}bg-emerald-50 text-emerald-700 border-emerald-200{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <a href="{% url 'admin:index' %}"
+     class="inline-flex items-center gap-1 text-sm text-blue-700 mb-3">‹ Django 관리자로</a>
+
+  <div class="flex items-center justify-between mb-2">
+    <p class="text-sm text-gray-600">카드 <b>{{ cards|length }}</b>장</p>
+    <a href="{% url 'character_quiz_admin:pdf_import' %}"
+       class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow active:bg-blue-700">
+      ＋ PDF에서 카드 추가
+    </a>
+  </div>
+
+  <p class="text-xs text-gray-400 mb-4">
+    ⚠ 카드 파일은 git 추적 대상입니다 — 운영 서버에서 직접 수정하면 리포와 어긋나므로,
+    로컬에서 수정 → 커밋 → 배포를 권장합니다.
+  </p>
+
+  {% if integrity_error %}
+  <div class="px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm mb-4">
+    카드 파일 정합성 오류: {{ integrity_error }}<br>
+    파일을 직접 정리한 뒤 새로고침하세요.
+  </div>
+  {% endif %}
+
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+    {% for c in cards %}
+    <div class="bg-white rounded-xl shadow p-3">
+      <p class="text-xs font-mono text-gray-500 truncate mb-2" title="{{ c.id }}">{{ c.id }}</p>
+      <div class="flex gap-1.5 mb-2">
+        <a href="{{ c.front_url }}" target="_blank" class="w-1/2">
+          <img src="{{ c.front_url }}" alt="{{ c.id }} 앞면" loading="lazy"
+               class="rounded border border-gray-200 w-full">
+        </a>
+        <a href="{{ c.back_url }}" target="_blank" class="w-1/2">
+          <img src="{{ c.back_url }}" alt="{{ c.id }} 뒷면" loading="lazy"
+               class="rounded border border-gray-200 w-full">
+        </a>
+      </div>
+      <div class="flex flex-wrap gap-1">
+        <button type="button" data-action="replace" data-card="{{ c.id }}" data-side="front"
+                class="cq-btn">앞면 교체</button>
+        <button type="button" data-action="replace" data-card="{{ c.id }}" data-side="back"
+                class="cq-btn">뒷면 교체</button>
+        <button type="button" data-action="rename" data-card="{{ c.id }}"
+                class="cq-btn">이름</button>
+        <button type="button" data-action="delete" data-card="{{ c.id }}"
+                class="cq-btn text-red-600">삭제</button>
+      </div>
+    </div>
+    {% empty %}
+    {% if not integrity_error %}
+    <p class="col-span-full text-center text-gray-400 py-10">카드가 없습니다.</p>
+    {% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<style>
+  .cq-btn {
+    font-size: .7rem; padding: .25rem .5rem; border-radius: .375rem;
+    background: #f3f4f6; color: #374151;
+  }
+  .cq-btn:active { background: #e5e7eb; }
+</style>
+
+{# 액션용 숨김 폼 3종 — 버튼이 값 채워서 제출 #}
+<form id="replace-form" method="post" enctype="multipart/form-data" class="hidden"
+      action="{% url 'character_quiz_admin:card_replace' %}">
+  {% csrf_token %}
+  <input type="hidden" name="card_id">
+  <input type="hidden" name="side">
+  <input type="file" name="image" accept="image/*">
+</form>
+<form id="rename-form" method="post" class="hidden"
+      action="{% url 'character_quiz_admin:card_rename' %}">
+  {% csrf_token %}
+  <input type="hidden" name="card_id">
+  <input type="hidden" name="new_id">
+</form>
+<form id="delete-form" method="post" class="hidden"
+      action="{% url 'character_quiz_admin:card_delete' %}">
+  {% csrf_token %}
+  <input type="hidden" name="card_id">
+</form>
+
+<script>
+(() => {
+  const replaceForm = document.getElementById("replace-form");
+  const renameForm = document.getElementById("rename-form");
+  const deleteForm = document.getElementById("delete-form");
+  const fileInput = replaceForm.querySelector("input[type=file]");
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files.length) replaceForm.submit();
+  });
+
+  document.querySelectorAll("[data-action]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const card = btn.dataset.card;
+      if (btn.dataset.action === "replace") {
+        replaceForm.card_id.value = card;
+        replaceForm.side.value = btn.dataset.side;
+        fileInput.value = "";
+        fileInput.click();
+      } else if (btn.dataset.action === "rename") {
+        const newId = prompt("'" + card + "' 의 새 이름 (한글/영문/숫자/_/-):", card);
+        if (!newId || newId === card) return;
+        renameForm.card_id.value = card;
+        renameForm.new_id.value = newId.trim();
+        renameForm.submit();
+      } else if (btn.dataset.action === "delete") {
+        if (!confirm("'" + card + "' 카드(앞/뒷면)를 삭제할까요?")) return;
+        deleteForm.card_id.value = card;
+        deleteForm.submit();
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

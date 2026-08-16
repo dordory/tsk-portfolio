@@ -1,0 +1,20 @@
+{% extends "base_with_tailwind.html" %}
+{% block title %}페이지를 찾을 수 없어요{% endblock %}
+{% block header %}📍 {{ congregation_name }} 구역관리{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+  <div class="bg-white rounded-xl shadow p-8 text-center space-y-4">
+    <p class="text-5xl">🔍</p>
+    <h2 class="text-lg font-bold text-gray-800">페이지를 찾을 수 없어요</h2>
+    <p class="text-sm text-gray-600">
+      주소가 바뀌었거나 없어진 페이지일 수 있습니다.<br>
+      입력하신 주소를 다시 한번 확인해 주세요.
+    </p>
+    <a href="{% url 'territory_cards:card_list' %}"
+       class="inline-block mt-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-lg shadow hover:bg-blue-700">
+      홈으로 가기
+    </a>
+  </div>
+</div>
+{% endblock %}

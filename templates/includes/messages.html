@@ -1,0 +1,46 @@
+{% if messages %}
+  <div id="messages" class="space-y-3 mb-6">
+    {% for message in messages %}
+      <div class="flex items-start justify-between p-4 rounded-lg shadow-sm border-l-4 text-sm relative
+                  {% if message.tags == 'error' %}
+                    bg-red-50 border-red-500 text-red-800
+                  {% elif message.tags == 'success' %}
+                    bg-green-50 border-green-500 text-green-800
+                  {% elif message.tags == 'warning' %}
+                    bg-yellow-50 border-yellow-500 text-yellow-800
+                  {% else %}
+                    bg-blue-50 border-blue-500 text-blue-800
+                  {% endif %}">
+        <div class="flex items-start">
+          <!-- 아이콘 -->
+          <svg class="w-5 h-5 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            {% if message.tags == 'error' %}
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 10-1.5 0v4.5a.75.75 0 001.5 0v-4.5zm0 6.75a.75.75 0 10-1.5 0 .75.75 0 001.5 0z" clip-rule="evenodd" />
+            {% elif message.tags == 'success' %}
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.53-9.97a.75.75 0 00-1.06-1.06L9 10.94 7.53 9.47a.75.75 0 00-1.06 1.06l2 2a.75.75 0 001.06 0l4-4z" clip-rule="evenodd" />
+            {% elif message.tags == 'warning' %}
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l6.518 11.594c.75 1.335-.213 2.998-1.743 2.998H3.482c-1.53 0-2.493-1.663-1.743-2.998L8.257 3.1zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-.25-2.25a.75.75 0 01-1.5 0v-3a.75.75 0 011.5 0v3z" clip-rule="evenodd" />
+            {% else %}
+              <path fill-rule="evenodd" d="M18 10A8 8 0 11 2 10a8 8 0 0116 0zM9.25 7a.75.75 0 011.5 0v4.5a.75.75 0 01-1.5 0V7zm.75 7.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clip-rule="evenodd" />
+            {% endif %}
+          </svg>
+          <div>{{ message }}</div>
+        </div>
+
+        <!-- 닫기 버튼 -->
+        <button class="ml-4 text-lg font-bold leading-none text-gray-400 hover:text-gray-600" onclick="this.parentElement.remove()" aria-label="Close">&times;</button>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- 자동 사라짐 JS -->
+  <script>
+    setTimeout(() => {
+      const messages = document.getElementById('messages');
+      if (messages) {
+        messages.classList.add('transition', 'opacity-0');
+        setTimeout(() => messages.remove(), 500);
+      }
+    }, 4000);  // 4초 후 사라짐
+  </script>
+{% endif %}

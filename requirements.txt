@@ -1,0 +1,16 @@
+asgiref==3.8.1
+crispy-bootstrap5==2025.4
+Django==5.2.1
+django-crispy-forms==2.4
+django-environ==0.14.0
+django-extensions==4.1
+django-widget-tweaks==1.5.0
+google-api-python-client==2.149.0
+google-auth>=2.49.0,<3.0.0
+# httplib2 프록시 경유(PythonAnywhere 무료 등)에 필수 — 없으면 프록시가 조용히 무시됨
+PySocks>=1.7.1
+# character_quiz 카드 관리화면(PDF 크롭)용 — cropper.py 에서 지연 import
+pillow>=12.0
+pypdfium2>=4.30
+pytz==2025.2
+sqlparse==0.5.3

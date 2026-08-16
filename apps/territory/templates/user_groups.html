@@ -1,0 +1,28 @@
+{% extends "base_with_tailwind.html" %}
+
+{% block title %}그룹 선택{% endblock %}
+{% block header %}👥 그룹 선택{% endblock %}
+
+{% block content %}
+{% if pending_line_name %}
+<div class="max-w-3xl mx-auto mb-4 text-center text-sm text-gray-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+  👋 <strong>{{ pending_line_name }}</strong> 님, 처음이시네요. 본인의 이름을 선택해 LINE 계정을 연결해주세요.<br>
+  연결에는 관리자에게 받은 <strong>초대코드</strong>가 필요합니다.<br>
+  자신이 소속된 집단을 선택하세요.
+</div>
+{% endif %}
+<div class="max-w-7xl mx-auto px-2 py-2">
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 justify-center">
+    {% for group in groups %}
+      <a href="{% url 'territory:user_login' %}?group_id={{ group.id }}"
+         class="{{ group.tile_bg_color }} rounded-xl shadow p-3 flex items-center justify-center min-h-[90px] hover:shadow-lg transition border border-gray-200 text-center">
+        <div class="{{ group.text_color }} text-3xl font-semibold break-keep">
+          {{ group.symbol }} {{ group.name }}
+        </div>
+      </a>
+    {% empty %}
+      <p class="text-gray-500 col-span-full text-center">등록된 그룹이 없습니다.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

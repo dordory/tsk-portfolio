@@ -1,0 +1,64 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>그룹 선택</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4 sm:p-6">
+  <div class="max-w-7xl mx-auto">
+    <h2 class="text-xl sm:text-2xl font-bold mb-6 text-gray-800 text-center sm:text-left">📌 Congregation 선택</h2>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 justify-center">
+      {% for congregation in congregations %}
+        {% if congregation.service_coverage < 50 or congregation.old_territory_count > 100 %}
+            <a href="/conductor/congregation/{{ congregation.id }}/territories/"
+            class="bg-red-100 border-red-300 border rounded-xl shadow p-4 sm:p-5 flex flex-col justify-between min-h-[160px] hover:shadow-lg transition">
+        {% else %}
+            <a href="/conductor/congregation/{{ congregation.id }}/territories/"
+            class="bg-white border-gray-200 border rounded-xl shadow p-4 sm:p-5 flex flex-col justify-between min-h-[160px] hover:shadow-lg transition">
+        {% endif %}
+          <div class="flex-grow">
+            <h2 class="text-base sm:text-lg font-semibold mb-1 break-keep break-words whitespace-normal
+              {% if congregation.service_coverage < 50 or congregation.old_territory_count > 100 %}
+                text-red-700
+              {% else %}
+                text-blue-800
+              {% endif %}">
+              {{ congregation.num }} {{ congregation.name }}
+            </h2>
+
+            <p class="text-sm sm:text-base text-gray-500 mb-0.5">번호: {{ congregation.num }}</p>
+
+            <p class="text-sm sm:text-base mb-0.5
+              {% if congregation.old_territory_count > 100 %}
+                text-red-600 font-semibold
+              {% else %}
+                text-gray-500
+              {% endif %}">
+              두달이상 방문하지 않은 구역 수: {{ congregation.old_territory_count }}
+            </p>
+
+            <p class="text-sm sm:text-base text-gray-500 mb-0.5">
+              전체 구역 수: {{ congregation.total_territory_count }}
+            </p>
+
+            <p class="text-sm sm:text-base
+              {% if congregation.service_coverage < 50 %}
+                text-red-600 font-semibold
+              {% else %}
+                text-gray-500
+              {% endif %}">
+              방문비: {{ congregation.service_coverage }}%
+            </p>
+          </div>
+        </a>
+      {% empty %}
+        <p class="text-gray-500 col-span-full text-center">등록된 그룹이 없습니다.</p>
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>

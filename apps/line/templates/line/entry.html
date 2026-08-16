@@ -1,0 +1,140 @@
+{% load static %}<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{{ congregation_name }} 구역관리 · LINE 로그인</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% if line_login_enabled %}
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js" defer></script>
+    {% endif %}
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center">
+    <div class="text-center p-8 max-w-sm w-full">
+        <p class="text-lg font-medium text-gray-800">📍 구역관리에 연결 중…</p>
+        <p id="liff-status" class="text-sm text-gray-500 mt-2">LINE 계정을 확인하고 있습니다.</p>
+
+        {% if line_dev_login %}
+        <div class="mt-6 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            ⚠️ 개발용 우회 로그인 모드 (LINE 미설정 · DEBUG)
+        </div>
+        <a href="{% url 'territory:user_groups' %}"
+           class="mt-4 inline-block w-full py-3 px-4 rounded-xl bg-blue-600 text-white text-base font-semibold shadow hover:bg-blue-700 transition">
+            멤버 선택하여 로그인
+        </a>
+        {% elif not line_login_enabled %}
+        <div class="mt-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-4">
+            LINE 로그인이 설정되지 않았습니다. 관리자에게 문의하세요.
+        </div>
+        {% endif %}
+    </div>
+
+    {% if line_login_enabled %}
+    <form id="liff-login-form" method="post" action="{% url 'line:login' %}" class="hidden">
+        {% csrf_token %}
+        <input type="hidden" name="id_token" id="id_token_input">
+        <input type="hidden" name="in_client" id="in_client_input" value="false">
+    </form>
+
+    <script>
+    (function () {
+        const liffId = "{{ liff_id|escapejs }}";
+        // 딥링크(?next=...) — 서버에서 검증된 값만 내려온다. 없으면 빈 문자열.
+        const nextPath = "{{ next_path|escapejs }}";
+        const statusEl = document.getElementById('liff-status');
+        const form = document.getElementById('liff-login-form');
+        const tokenInput = document.getElementById('id_token_input');
+        const inClientInput = document.getElementById('in_client_input');
+
+        function fail(msg) {
+            statusEl.textContent = msg;
+            statusEl.className = 'text-sm text-red-500 mt-2';
+        }
+
+        function getCookie(name) {
+            const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return m ? decodeURIComponent(m.pop()) : '';
+        }
+
+        // 캐시된 ID Token 이 (곧) 만료인지 판정. exp 는 초 단위 UNIX 시각.
+        // getDecodedIDToken() 이 없거나 파싱 실패면 "만료로 간주"하지 않고 서버 검증에 맡긴다.
+        function idTokenExpired() {
+            try {
+                const decoded = liff.getDecodedIDToken && liff.getDecodedIDToken();
+                if (!decoded || !decoded.exp) return false;
+                // 60초 여유(클럭 스큐/전송 지연 대비).
+                return (decoded.exp * 1000) <= (Date.now() + 60000);
+            } catch (e) { return false; }
+        }
+
+        // 만료 시 새 토큰을 받기 위해 강제 재로그인. 무한루프 방지 가드(세션당 1회).
+        function reauth() {
+            if (sessionStorage.getItem('liff_reauthed') === '1') {
+                fail('로그인이 만료되었습니다. 앱을 다시 열어주세요.');
+                return;
+            }
+            sessionStorage.setItem('liff_reauthed', '1');
+            try { liff.logout(); } catch (e) {}
+            if (liff.isInClient && liff.isInClient()) {
+                // LIFF 브라우저에서는 liff.login() 을 부를 수 없다.
+                // logout 으로 저장 토큰을 비운 뒤 쿼리 없는 경로로 리로드하면
+                // liff.init 의 자동 로그인이 새 토큰(최신 프로필)을 받아온다.
+                window.location.replace(window.location.pathname);
+                return;
+            }
+            // 외부 브라우저: LINE 로그인으로 리다이렉트 → 돌아오면 새 토큰.
+            // 복귀 주소는 쿼리를 뗀다(?reauth=1 이 남아 있으면 재인증 루프).
+            liff.login({ redirectUri: window.location.origin + window.location.pathname });
+        }
+
+        window.addEventListener('load', async () => {
+            if (!liffId) { fail('LIFF ID가 설정되지 않았습니다.'); return; }
+            if (typeof liff === 'undefined') { fail('LIFF SDK를 불러오지 못했습니다.'); return; }
+            try {
+                await liff.init({ liffId });
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+                {% if force_reauth %}
+                // ?reauth=1 (테스트용 강제 재인증): 캐시 토큰을 버리고 새로 받는다.
+                reauth(); return;
+                {% endif %}
+                // 캐시된 토큰이 만료면 서버로 보내기 전에 재로그인.
+                if (idTokenExpired()) { reauth(); return; }
+
+                const idToken = liff.getIDToken();
+                if (!idToken) { reauth(); return; }
+
+                // 검증된 토큰을 서버로 전송. 응답의 redirect 로 이동한다.
+                const res = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: new URLSearchParams({
+                        id_token: idToken,
+                        in_client: liff.isInClient() ? 'true' : 'false',
+                        next: nextPath,
+                    }),
+                });
+                const data = await res.json();
+                if (res.ok && data.redirect) {
+                    sessionStorage.removeItem('liff_reauthed');  // 성공 시 가드 해제
+                    window.location.href = data.redirect;
+                } else if (res.status === 400 && data.error && data.error.indexOf('expired') !== -1) {
+                    // 서버가 만료 판정 → 새 토큰 받아 재시도.
+                    reauth();
+                } else {
+                    fail(data.error || '로그인에 실패했습니다.');
+                }
+            } catch (e) {
+                fail('LIFF 초기화 실패: ' + (e && e.message ? e.message : e));
+            }
+        });
+    })();
+    </script>
+    {% endif %}
+</body>
+</html>

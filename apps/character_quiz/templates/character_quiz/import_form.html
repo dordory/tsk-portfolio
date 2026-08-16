@@ -1,0 +1,87 @@
+{% extends "base_with_tailwind.html" %}
+{% block title %}PDF에서 카드 추가{% endblock %}
+{% block header %}🛠 인물카드 관리{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+
+  {% if messages %}
+  <div class="space-y-2 mb-4">
+    {% for message in messages %}
+    <div class="px-4 py-2 rounded-lg text-sm border
+                {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200
+                {% else %}bg-emerald-50 text-emerald-700 border-emerald-200{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <a href="{% url 'character_quiz_admin:card_manage' %}"
+     class="inline-flex items-center gap-1 text-sm text-blue-700 mb-3">‹ 카드 목록으로</a>
+
+  <h2 class="text-lg font-bold text-gray-800 mb-1">PDF에서 카드 추가</h2>
+  <p class="text-sm text-gray-500 mb-4">
+    JW.org 「성서 카드 모으기」 PDF 를 올리면 앞면/뒷면 이미지로 잘라 미리보기를 보여줍니다.
+    저장을 누르기 전에는 반영되지 않습니다.
+  </p>
+
+  {% if not libs_ok %}
+  <div class="px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm mb-4">
+    {{ libs_msg }}
+  </div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" id="import-form"
+        class="bg-white rounded-xl shadow p-4 space-y-4">
+    {% csrf_token %}
+
+    <div>
+      <label class="block text-sm font-semibold text-gray-700 mb-1">PDF 파일 (여러 개 가능)</label>
+      <input type="file" name="pdf_files" accept="application/pdf" multiple required
+             class="block w-full text-sm text-gray-600
+                    file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0
+                    file:bg-blue-50 file:text-blue-700 file:text-sm file:font-semibold">
+    </div>
+
+    <details class="text-sm">
+      <summary class="cursor-pointer text-gray-500">고급 옵션</summary>
+      <div class="mt-3 grid grid-cols-3 gap-3">
+        <label class="block">
+          <span class="text-xs text-gray-500">해상도(dpi)</span>
+          <input type="number" name="dpi" value="{{ defaults.dpi }}" min="72" max="400"
+                 class="mt-1 w-full rounded-lg border-gray-300 border px-2 py-1">
+        </label>
+        <label class="block">
+          <span class="text-xs text-gray-500">최대 폭(px)</span>
+          <input type="number" name="width" value="{{ defaults.width }}" min="300" max="2000"
+                 class="mt-1 w-full rounded-lg border-gray-300 border px-2 py-1">
+        </label>
+        <label class="block">
+          <span class="text-xs text-gray-500">JPEG 품질</span>
+          <input type="number" name="quality" value="{{ defaults.quality }}" min="50" max="100"
+                 class="mt-1 w-full rounded-lg border-gray-300 border px-2 py-1">
+        </label>
+      </div>
+      <label class="mt-3 flex items-center gap-2 text-gray-600">
+        <input type="checkbox" name="auto_detect" value="1" class="rounded">
+        카드 영역 자동 감지 사용 (등록된 템플릿 좌표 대신)
+      </label>
+    </details>
+
+    <button type="submit" id="submit-btn" {% if not libs_ok %}disabled{% endif %}
+            class="w-full py-2.5 rounded-lg bg-blue-600 text-white font-semibold shadow
+                   active:bg-blue-700 disabled:opacity-40">
+      크롭해서 미리보기
+    </button>
+  </form>
+</div>
+
+<script>
+  document.getElementById("import-form").addEventListener("submit", () => {
+    const btn = document.getElementById("submit-btn");
+    btn.disabled = true;
+    btn.textContent = "처리 중… (파일당 몇 초 걸립니다)";
+  });
+</script>
+{% endblock %}

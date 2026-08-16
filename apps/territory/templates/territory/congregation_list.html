@@ -1,0 +1,58 @@
+<!-- templates/territory/congregation_list.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Congregation 목록</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6">
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-3xl font-bold mb-8 text-center">📍 Congregation 목록</h1>
+    
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {% for congregation in congregations %}
+        <a href="{% url 'territory:congregation_territories' congregation.pk %}" 
+          class="block p-6 rounded-xl shadow hover:shadow-lg transition-all hover:border-blue-400
+          {% if congregation.service_coverage < 50 or congregation.old_territory_count > 100 %}
+            bg-red-100 border border-red-300
+          {% else %}
+            bg-white border
+          {% endif %}">
+          
+          <div class="text-xl font-semibold 
+            {% if congregation.service_coverage < 50 or congregation.old_territory_count > 100 %}
+              text-red-700
+            {% else %}
+              text-blue-800
+            {% endif %}">
+            {{ congregation.num }} {{ congregation.name }}
+          </div>
+
+          <div class="mt-1 text-sm text-gray-500">번호: {{ congregation.num }}</div>
+          <div class="text-sm 
+            {% if congregation.old_territory_count > 100 %}
+              text-red-600 font-semibold
+            {% else %}
+              text-gray-500
+            {% endif %}">
+            두달이상 방문하지 않은 구역 수: {{ congregation.old_territory_count }}
+          </div>
+          <div class="text-sm text-gray-500">전체 구역 수: {{ congregation.total_territory_count }}</div>
+          <div class="text-sm 
+            {% if congregation.service_coverage < 50 %}
+              text-red-600 font-semibold
+            {% else %}
+              text-gray-500
+            {% endif %}">
+            방문비: {{ congregation.service_coverage }} %
+          </div>
+        </a>
+      {% empty %}
+        <p class="col-span-full text-center text-gray-500">등록된 Congregation이 없습니다.</p>
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>

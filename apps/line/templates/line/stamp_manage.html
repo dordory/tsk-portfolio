@@ -1,0 +1,113 @@
+{% extends "base_with_tailwind.html" %}
+{% block title %}성구 스탬프 관리{% endblock %}
+{% block header %}🌟 성구 스탬프 관리{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+
+  <a href="{% url 'admin:index' %}"
+     class="inline-flex items-center gap-1 text-sm text-blue-700 mb-3">‹ Django 관리자로</a>
+
+  {% if not participants %}
+  <div class="px-4 py-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-sm">
+    일용할 성구 참여자가 없습니다 —
+    Django 관리자의 「일용할 성구 참여자」에서 먼저 등록하세요.
+  </div>
+  {% else %}
+
+  {# 참여자 선택 #}
+  <div class="flex flex-wrap gap-2 mb-4">
+    {% for p in participants %}
+    <a href="?participant={{ p.pk }}&year={{ year }}&month={{ month }}"
+       class="px-3 py-1.5 rounded-full text-sm font-semibold border
+              {% if p == selected %}bg-blue-600 text-white border-blue-600
+              {% else %}bg-white text-gray-700 border-gray-300{% endif %}">
+      {{ p.member.name }}{% if not p.active %} <span class="opacity-60">(비활성)</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+
+  {# 월 이동 #}
+  <div class="flex items-center justify-between mb-2">
+    <a href="?participant={{ selected.pk }}&year={{ prev_year }}&month={{ prev_month }}"
+       class="px-3 py-1 rounded-lg text-sm bg-gray-100 text-gray-700">‹ 이전 달</a>
+    <p class="font-bold">{{ year }}년 {{ month }}월
+      <span class="text-sm font-normal text-gray-500">(<span id="month-count">{{ count }}</span>회)</span>
+    </p>
+    {% if has_next %}
+    <a href="?participant={{ selected.pk }}&year={{ next_year }}&month={{ next_month }}"
+       class="px-3 py-1 rounded-lg text-sm bg-gray-100 text-gray-700">다음 달 ›</a>
+    {% else %}
+    <span class="px-3 py-1 rounded-lg text-sm bg-gray-50 text-gray-300">다음 달 ›</span>
+    {% endif %}
+  </div>
+
+  {# 달력 — 날짜를 탭하면 도장 토글 #}
+  <div class="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-1">
+    <span>월</span><span>화</span><span>수</span><span>목</span><span>금</span>
+    <span class="text-blue-600">토</span><span class="text-red-500">일</span>
+  </div>
+  {% for week in weeks %}
+  <div class="grid grid-cols-7 gap-1 mb-1">
+    {% for cell in week %}
+      {% if not cell %}
+      <span></span>
+      {% elif cell.future %}
+      <span class="py-2.5 rounded-xl text-center text-sm text-gray-300">{{ cell.day }}</span>
+      {% else %}
+      <button type="button" data-date="{{ cell.iso }}"
+              class="stamp-day py-2.5 rounded-xl text-center text-sm border transition
+                     {% if cell.checked %}bg-blue-600 text-white font-bold border-blue-600
+                     {% else %}bg-gray-100 text-gray-500 border-gray-200{% endif %}">
+        {{ cell.day }}
+      </button>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <p class="text-xs text-gray-400 mt-3">
+    날짜를 탭하면 도장이 찍히거나 빠집니다(과거·오늘만).
+    아이의 스탬프 카드/정산에 즉시 반영됩니다.
+  </p>
+
+  <form id="csrf-holder" class="hidden">{% csrf_token %}</form>
+
+  <script>
+    (function () {
+      const CHECKED = ["bg-blue-600", "text-white", "font-bold", "border-blue-600"];
+      const UNCHECKED = ["bg-gray-100", "text-gray-500", "border-gray-200"];
+      const csrf = document.querySelector("#csrf-holder [name=csrfmiddlewaretoken]").value;
+
+      document.querySelectorAll(".stamp-day").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          try {
+            const body = new URLSearchParams({
+              participant: "{{ selected.pk }}",
+              date: btn.dataset.date,
+            });
+            const resp = await fetch("{% url 'line_admin:stamp_toggle' %}", {
+              method: "POST",
+              headers: {"X-CSRFToken": csrf,
+                        "Content-Type": "application/x-www-form-urlencoded"},
+              body,
+            });
+            if (!resp.ok) throw new Error();
+            const data = await resp.json();
+            btn.classList.remove(...(data.checked ? UNCHECKED : CHECKED));
+            btn.classList.add(...(data.checked ? CHECKED : UNCHECKED));
+            document.getElementById("month-count").textContent = data.count;
+          } catch (e) {
+            alert("저장하지 못했습니다. 새로고침 후 다시 시도하세요.");
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+    })();
+  </script>
+
+  {% endif %}
+</div>
+{% endblock %}

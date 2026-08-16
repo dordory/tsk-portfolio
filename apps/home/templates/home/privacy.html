@@ -1,0 +1,110 @@
+{% extends "base_with_tailwind.html" %}
+{% block title %}개인정보처리방침{% endblock %}
+{% block header %}🔒 개인정보처리방침{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+  <div class="bg-white rounded-xl shadow p-5 text-sm text-gray-700 leading-relaxed space-y-6">
+
+    <p>
+      본 방침은 LINE 미니앱 <strong>아몬드 그룹 도구</strong>(이하 "본 서비스")가 이용자의
+      개인정보를 어떻게 수집·이용·보관하는지를 설명합니다. 본 서비스는 회중의
+      봉사구역카드 사용을 위해 회중 구성원에게만 제공되는 비영리 내부용 서비스입니다.
+    </p>
+
+    <section>
+      <h2 class="font-bold text-gray-900 mb-2">1. 수집하는 정보</h2>
+      <ul class="list-disc pl-5 space-y-1">
+        <li><strong>LINE 계정 정보</strong> — LINE 사용자 식별자(User ID), 표시 이름.
+          LINE 로그인(LIFF) 과정에서 취득하며, 계정 연결과 본인 확인에만 사용합니다.</li>
+        <li><strong>구성원 정보</strong> — 이름, 소속 그룹. 서비스 이용 자격 확인을 위해
+          관리자가 사전에 등록합니다.</li>
+        <li><strong>서비스 이용 기록</strong> — 구역 방문 기록(구역, 일시, 방문 결과),
+          담당자 지정 내역 등 이용자가 직접 입력한 정보. 이 정보는 서버에
+          저장되지 않고 회중이 관리하는 Google Sheets 문서에만 기록됩니다.</li>
+        <li><strong>쿠키(세션)</strong> — 로그인 상태 유지를 위한 세션 쿠키.
+          광고·추적 목적의 쿠키는 사용하지 않습니다.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="font-bold text-gray-900 mb-2">2. 이용 목적</h2>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>LINE 계정과 구성원 계정의 연결 및 본인 확인</li>
+        <li>전도구역 정보의 열람·기록 등 서비스 기능 제공</li>
+        <li>부정 접근 방지 및 서비스 안정 운영</li>
+      </ul>
+      <p class="mt-2">위 목적 외의 용도(마케팅, 광고 등)로는 일절 이용하지 않습니다.</p>
+    </section>
+
+    <section>
+      <h2 class="font-bold text-gray-900 mb-2">3. 제3자 제공 및 처리 위탁</h2>
+      <p>
+        본 서비스는 이용자의 개인정보를 본인의 동의 없이 제3자에게 판매·제공하지
+        않습니다. 다만 서비스 운영을 위해 아래와 같이 정보가 전달·보관됩니다.
+      </p>
+      <div class="overflow-x-auto mt-2">
+        <table class="w-full text-xs border-collapse">
+          <thead>
+            <tr class="border-b border-gray-300 text-left">
+              <th class="py-1 pr-2">대상</th>
+              <th class="py-1 pr-2">전달·보관되는 정보</th>
+              <th class="py-1">시점</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <tr>
+              <td class="py-1 pr-2 align-top">LY Corporation<br>(LINE 플랫폼)</td>
+              <td class="py-1 pr-2 align-top">미니앱 접속·이용에 수반되는 정보</td>
+              <td class="py-1 align-top">본 서비스를 LINE 앱 내에서 이용할 때</td>
+            </tr>
+            <tr>
+              <td class="py-1 pr-2 align-top">Google LLC<br>(Google Sheets/Drive)</td>
+              <td class="py-1 pr-2 align-top">구역 방문 기록, 담당자 이름</td>
+              <td class="py-1 align-top">이용자가 방문 기록 등을 입력·열람할 때</td>
+            </tr>
+            <tr>
+              <td class="py-1 pr-2 align-top">Anaconda Inc.<br>(PythonAnywhere 호스팅)</td>
+              <td class="py-1 pr-2 align-top">LINE 계정 정보, 구성원 정보, 세션 정보
+                (방문 기록은 서버에 저장되지 않습니다)</td>
+              <td class="py-1 align-top">서비스 이용 전반</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-2 text-xs text-gray-500">
+        위 사업자들은 각사의 개인정보처리방침에 따라 정보를 취급합니다.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="font-bold text-gray-900 mb-2">4. 보관 및 파기</h2>
+      <p>
+        개인정보는 서비스 제공에 필요한 기간 동안만 보관하며, 구성원 자격 상실
+        또는 본인 요청 시 지체 없이 삭제합니다. LINE 계정 연결은 관리자에게
+        요청하여 언제든지 해제할 수 있습니다.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="font-bold text-gray-900 mb-2">5. 이용자의 권리</h2>
+      <p>
+        이용자는 자신의 개인정보에 대한 열람·정정·삭제를 언제든지 요청할 수
+        있습니다. 요청은 아래 문의처로 연락해 주세요.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="font-bold text-gray-900 mb-2">6. 문의처</h2>
+      <p>
+        본 서비스 운영자(회중 봉사 관리 담당자)<br>
+        문의: 관리자에게 직접 연락하거나 LINE 으로 문의해 주세요.
+      </p>
+    </section>
+
+    <p class="text-xs text-gray-400 pt-2 border-t border-gray-100">
+      시행일: 2026년 7월 23일
+    </p>
+  </div>
+</div>
+{% endblock %}

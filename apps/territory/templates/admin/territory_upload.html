@@ -1,0 +1,22 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <h1>CSV 업로드 결과</h1>
+
+  {% if errors %}
+    <div class="messages error">
+      <p>업로드 중 오류가 발생했습니다:</p>
+      <ul>
+        {% for error in errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% else %}
+    <div class="messages success">
+      <p>{{ uploaded_count }}개의 Territory 및 방문 기록이 성공적으로 업로드되었습니다.</p>
+    </div>
+  {% endif %}
+
+  <p><a href="{% url 'admin:territory_territory_changelist' %}">⟵ Territory 목록으로 돌아가기</a></p>
+{% endblock %}

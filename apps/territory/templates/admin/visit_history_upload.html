@@ -1,0 +1,10 @@
+{# templates/admin/visit_history_upload.html #}
+{% extends "admin/base_site.html" %}
+{% block content %}
+  <h2>📤 VisitHistory CSV 업로드</h2>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="default">업로드</button>
+  </form>
+{% endblock %}

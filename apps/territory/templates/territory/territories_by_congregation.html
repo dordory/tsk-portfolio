@@ -1,0 +1,88 @@
+<!-- templates/territory/territories_by_congregation.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ congregation.name }}의 Territory 목록</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6">
+  <div class="max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold text-center mb-8">🗺️ {{ congregation.name }}의 구역 목록</h1>
+
+<a href="{% url 'territory:congregation_list' %}" 
+   class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded">
+  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+  </svg>
+  회중 목록으로
+</a>
+
+{% if territories %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    {% for territory in territories %}
+      <div class="{% if territory.is_old %}bg-red-100 border border-red-300{% else %}bg-amber-50{% endif %} rounded shadow p-4 flex flex-col justify-between h-full">
+        <div>
+          <h3 class="text-lg font-bold text-blue-800 mb-1">{{ territory.address1 }} {{ territory.address2 }}</h3>
+          <h3 class="text-lg font-bold text-blue-800 mb-1">{{ territory.address_detail }}</h3>
+          <p class="text-sm text-gray-600">메모: {{ territory.note }}</p>
+
+          {% if territory.last_visited_at %}
+            <p class="mt-2 text-xs {% if territory.is_old %}text-red-700 font-semibold{% else %}text-gray-500{% endif %}">
+              🕒 마지막 방문: {{ territory.last_visited_at|date:"Y년m월d일 H시i분" }}
+            </p>
+          {% else %}
+            <p class="mt-2 text-xs text-gray-400">📭 방문 기록 없음</p>
+          {% endif %}
+
+          {% if territory.assigned_to %}
+            <p class="mt-2 text-xs text-gray-500">
+              🕒 임명된 봉사자: {{ territory.assigned_to }}
+            </p>
+          {% else %}
+            <p class="mt-2 text-xs text-gray-400">📭 임명된 봉사자 없음</p>
+          {% endif %}
+        </div>
+
+        <div class="mt-4 flex justify-between items-center pt-4 border-t">
+          <a href="{{ territory.map_link }}"
+             target="_blank"
+             class="inline-flex items-center space-x-1 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition whitespace-nowrap">
+            <!-- Heroicon: Map -->
+            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 20l-5.447-2.724A2 2 0 013 15.382V5.618a2 2 0 011.553-1.948L9 2m0 18l6-3m0 0l5.447 2.724A2 2 0 0021 18.382V8.618a2 2 0 00-1.553-1.948L15 6m0 9l-6 3m6-3V6m0 9V6" />
+            </svg>
+            지도
+          </a>
+          <a href="{% url 'territory:territory_detail_from_congregation' congregation.id territory.id %}" 
+             class="inline-flex items-center space-x-1 px-3 py-1 bg-gray-700 text-white text-sm rounded hover:bg-gray-800 transition whitespace-nowrap">
+            자세히 보기
+            <!-- Heroicon: Eye -->
+            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0zm6 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-center text-gray-500">등록된 구역이 없습니다.</p>
+{% endif %}
+
+<a href="{% url 'territory:congregation_list' %}" 
+   class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded">
+  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+  </svg>
+  회중 목록으로
+</a>
+
+  </div>
+</body>
+</html>

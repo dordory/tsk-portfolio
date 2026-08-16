@@ -1,0 +1,44 @@
+{% extends "base_with_tailwind.html" %}
+
+{% block title %}로그인{% endblock %}
+{% block header %}👤 사용자 선택{% endblock %}
+
+{% block content %}
+{% if onboarding %}
+<div class="max-w-3xl mx-auto mb-4 text-center text-sm text-gray-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+  자신의 이름을 선택하신 후에 본인 확인용 인증코드를 입력하세요
+</div>
+{% endif %}
+<div class="max-w-3xl mx-auto text-center {{ group.bg_color }} pt-1 pl-4 pr-4 pb-4">
+  <h1 class="text-xl sm:text-xl font-bold mt-1 mb-3 {{ group.text_color }}">{{ group.symbol }} {{ group.name }} 그룹</h1>
+  <!-- p class="text-gray-600 mb-8">로그인할 사용자를 선택해주세요.</p -->
+
+  <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+    {% for member in members %}
+        {% if onboarding and member.line_profile %}
+        {# 이미 LINE 계정이 연결된 멤버 — 온보딩에서는 선택 불가 #}
+        <div class="bg-gray-100 rounded-xl shadow-inner p-3 flex items-center justify-center min-h-[56px] opacity-60">
+            <span class="text-base font-bold text-gray-500 break-keep">🔗 {{ member.name }}</span>
+        </div>
+        {% else %}
+        <form method="post" action="{% url 'territory:link_member' %}" class="block">
+            {% csrf_token %}
+            <input type="hidden" name="member_id" value="{{ member.id }}">
+            <button type="submit"
+                class="w-full {{ group.tile_bg_color }} rounded-xl shadow p-3 hover:shadow-lg transition flex items-center justify-center min-h-[56px]">
+                <span class="text-base font-bold break-keep {{ group.text_color }}">{{ member.name }}</span>
+            </button>
+        </form>
+        {% endif %}
+    {% empty %}
+        <p class="text-gray-500 col-span-full text-center">등록된 사용자가 없습니다.</p>
+    {% endfor %}
+  </div>
+
+  {% if onboarding %}
+  <p class="text-sm text-gray-500 mt-6">
+    명단에 이름이 없거나 본인이 이미 🔗(연결됨)로 표시되면 관리자에게 문의하세요.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}

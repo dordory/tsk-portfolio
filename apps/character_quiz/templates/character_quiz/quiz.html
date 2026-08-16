@@ -1,0 +1,176 @@
+{% extends "base_with_tailwind.html" %}
+{% block title %}성서 인물 카드{% endblock %}
+{% block header %}🃏 성서 인물 카드{% endblock %}
+
+{% block content %}
+<style>
+  /* 카드를 최대한 크게 — 이 화면에서는 사이트 헤더만 숨기고 여백 축소(푸터는 유지) */
+  body > header { display: none; }
+
+  /* 실제 가시 높이(100dvh) 기준으로 맞춤 — 모바일 주소창 수축/확장 대응.
+     base 의 .min-h-screen(100vh)이 클래스 특이도로 이기므로 !important 필요. */
+  body { min-height: 100dvh !important; }
+
+  /* main(flex-grow) → 내부 래퍼 → #quiz-root 로 flex 를 이어서
+     카드 영역이 헤더/푸터를 뺀 세로 공간을 전부 차지하게 한다. */
+  main { display: flex; }
+  main > div.max-w-7xl { padding: .5rem .75rem; flex: 1 1 auto; display: flex; min-height: 0; }
+
+  /* 카드 앞뒤 3D 플립 */
+  #card-scene { perspective: 1200px; }
+  #card-inner {
+    position: relative; width: 100%; height: 100%;
+    transform-style: preserve-3d;
+    transition: transform .4s cubic-bezier(.4, .2, .2, 1);
+  }
+  #card-inner.cq-flipped { transform: rotateY(180deg); }
+  #card-inner.cq-noanim { transition: none; }
+  .cq-face {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: contain;  /* 카드 원본 크기가 판형마다 미세하게 달라도(673×836/670×825) 왜곡 없이 */
+    -webkit-backface-visibility: hidden; backface-visibility: hidden;
+    border-radius: .75rem; box-shadow: 0 4px 14px rgb(0 0 0 / .15);
+    background: #fff;
+  }
+  .cq-back { transform: rotateY(180deg); }
+
+  /* 카드 전환 애니메이션 (스와이프 방향에서 들어옴 — bible_reading 과 동일 톤) */
+  @keyframes cq-slide-left  { from { opacity: .2; transform: translateX(36px);  } to { opacity: 1; transform: none; } }
+  @keyframes cq-slide-right { from { opacity: .2; transform: translateX(-36px); } to { opacity: 1; transform: none; } }
+  .cq-anim-left  { animation: cq-slide-left  .2s ease-out; }
+  .cq-anim-right { animation: cq-slide-right .2s ease-out; }
+</style>
+
+<div class="max-w-lg mx-auto w-full flex flex-col select-none" id="quiz-root">
+
+  {# 상단 한 줄: 진행 카운터 · 다시 섞기 (사용법 안내는 카드 아래) #}
+  <div class="flex items-center justify-between gap-2 mb-2">
+    <span id="counter" class="text-sm text-gray-500 tabular-nums shrink-0"></span>
+    <button type="button" id="reshuffle" title="다시 섞기"
+            class="text-sm px-2.5 py-1 rounded-full bg-white shadow text-gray-600 active:bg-gray-100 shrink-0">
+      🔀 다시 섞기
+    </button>
+  </div>
+
+  {# 카드: 탭=앞뒤 전환. 원본 비율(673:836)을 유지하며 남은 세로 공간의 한가운데에 최대 크기로. #}
+  {# 크기는 JS(fitCard)가 카드 영역 실측치로 가로·세로를 모두 지정 — CSS aspect-ratio 의 #}
+  {# min/max 이월(transfer) 동작이 브라우저마다 달라 이미지가 늘어나는 문제가 있었다. #}
+  <div id="card-wrap" class="flex-1 min-h-0 flex items-center justify-center">
+    <div id="card-scene" class="cursor-pointer">
+      <div id="card-inner">
+        <img id="face-front" class="cq-face" alt="카드 앞면 (문제)">
+        <img id="face-back" class="cq-face cq-back" alt="카드 뒷면 (정답)">
+      </div>
+    </div>
+  </div>
+
+  {# 사용법 안내 — 초기 버전의 카드 하단 문구 복원 #}
+  <p class="text-center text-xs text-gray-400 mt-2 shrink-0">
+    탭: 문제↔정답 · 좌우 스와이프: 다음/이전 카드
+  </p>
+</div>
+
+{{ cards|json_script:"card-data" }}
+<script>
+(() => {
+  const cards = JSON.parse(document.getElementById("card-data").textContent);
+  const wrap = document.getElementById("card-wrap");
+  const scene = document.getElementById("card-scene");
+  const inner = document.getElementById("card-inner");
+
+  // 카드 크기: 영역(wrap) 실측치 안에서 원본 비율(673:836)로 최대 크기.
+  // 가로·세로를 모두 px 로 못박아 브라우저별 aspect-ratio 해석 차이를 배제한다.
+  const RATIO = 673 / 836;
+  function fitCard() {
+    const w = Math.min(wrap.clientWidth, wrap.clientHeight * RATIO);
+    scene.style.width = w + "px";
+    scene.style.height = (w / RATIO) + "px";
+  }
+  new ResizeObserver(fitCard).observe(wrap);
+  fitCard();
+  const frontImg = document.getElementById("face-front");
+  const backImg = document.getElementById("face-back");
+  const counter = document.getElementById("counter");
+
+  // 표시 순서: 페이지 로드/다시 섞기 때마다 새로 셔플 (Fisher–Yates)
+  function shuffled() {
+    const a = cards.map((_, i) => i);
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  let order = shuffled();
+  let pos = -1;
+
+  function preload(index) {
+    if (index < 0 || index >= order.length) return;
+    const card = cards[order[index]];
+    [card.front, card.back].forEach((url) => { new Image().src = url; });
+  }
+
+  function show(index, direction) {
+    index = Math.max(0, Math.min(order.length - 1, index));
+    if (index === pos) return;
+    pos = index;
+
+    // 새 카드는 항상 앞면(문제)부터 — 플립은 애니메이션 없이 리셋
+    inner.classList.add("cq-noanim");
+    inner.classList.remove("cq-flipped");
+    requestAnimationFrame(() => inner.classList.remove("cq-noanim"));
+
+    const card = cards[order[pos]];
+    frontImg.src = card.front;
+    backImg.src = card.back;
+
+    scene.classList.remove("cq-anim-left", "cq-anim-right");
+    if (direction) {
+      void scene.offsetWidth;  // 같은 클래스 재적용 시 애니메이션 재시작
+      scene.classList.add(direction === "left" ? "cq-anim-left" : "cq-anim-right");
+    }
+
+    counter.textContent = (pos + 1) + " / " + order.length;
+    preload(pos + 1);
+    preload(pos - 1);
+  }
+
+  // 탭: 앞뒤 전환
+  scene.addEventListener("click", () => inner.classList.toggle("cq-flipped"));
+
+  // 좌우 스와이프: 다음/이전 (세로 스크롤과 구분 — 가로 이동이 크고 우세할 때만)
+  let startX = 0, startY = 0;
+  scene.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  scene.addEventListener("touchend", (e) => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) show(pos + 1, "left");
+      else show(pos - 1, "right");
+    }
+  }, { passive: true });
+
+  // 데스크톱 확인용: ←/→ 카드 이동, 스페이스/엔터 플립
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") show(pos + 1, "left");
+    else if (e.key === "ArrowLeft") show(pos - 1, "right");
+    else if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      inner.classList.toggle("cq-flipped");
+    }
+  });
+
+  document.getElementById("reshuffle").addEventListener("click", () => {
+    order = shuffled();
+    pos = -1;
+    show(0, "left");
+  });
+
+  show(0);
+})();
+</script>
+{% endblock %}

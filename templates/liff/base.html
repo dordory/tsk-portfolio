@@ -1,0 +1,50 @@
+{% load liff %}<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% block title %}구역관리{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% liff_sdk %}
+    <style>
+        body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+        .liff-tab-active { color: #06C755; }
+    </style>
+    {% block head_extra %}{% endblock %}
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans min-h-screen liff">
+
+    <main class="max-w-lg mx-auto px-4 pt-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <nav class="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 shadow-[0_-1px_2px_rgba(0,0,0,0.04)]"
+         style="padding-bottom: env(safe-area-inset-bottom);">
+        <div class="max-w-lg mx-auto grid grid-cols-2 text-xs">
+            <a href="{% url 'territory:user_assigned_territories' %}"
+               class="flex flex-col items-center py-2 {% if request.resolver_match.url_name == 'user_assigned_territories' %}liff-tab-active{% else %}text-gray-500{% endif %}">
+                <span class="text-lg leading-none">🗂️</span>
+                <span class="mt-1">내 구역</span>
+            </a>
+            <a href="{% url 'territory:user_logout' %}"
+               class="flex flex-col items-center py-2 text-gray-500">
+                <span class="text-lg leading-none">🚪</span>
+                <span class="mt-1">로그아웃</span>
+            </a>
+        </div>
+    </nav>
+
+    <script>
+        // 지도 등 외부 링크는 LINE 인앱에서 liff.openWindow() 로 외부 브라우저에서 연다.
+        document.addEventListener('click', function (e) {
+            const a = e.target.closest('a[data-external]');
+            if (!a) return;
+            if (typeof liff !== 'undefined' && liff.openWindow) {
+                e.preventDefault();
+                liff.openWindow({ url: a.href, external: true });
+            }
+        });
+    </script>
+    {% block body_extra %}{% endblock %}
+</body>
+</html>

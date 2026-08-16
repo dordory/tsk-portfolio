@@ -1,0 +1,152 @@
+<!-- templates/territory/user_territory_detail.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ congregation.name }}의 Territory 목록</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const popup = document.getElementById("popup-message");
+    if (popup) {
+      setTimeout(() => {
+        popup.classList.add("opacity-0", "transition-opacity", "duration-500");
+        setTimeout(() => popup.remove(), 500);
+      }, 1500);
+    }
+  });
+</script>
+
+<body class="bg-gray-100 p-4 sm:p-6 md:p-8">
+  <div class="max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto">
+    <h2 class="text-xl sm:text-2xl font-bold mb-4">구역 상세정보</h2>
+
+    <div class="bg-white p-4 sm:p-6 rounded shadow space-y-4">
+      <p><strong>코드:</strong> {{ territory.code }}</p>
+      <p><strong>주소:</strong> {{ territory.address1 }} {{ territory.address2 }} {{ territory.address_detail }}</p>
+      <p><strong>봉사자:</strong> {{ territory.assigned_to|default:territory.private_assigned_to }}</p>
+
+      <div class="mt-8 sm:mt-10">
+        <form method="post" action="{% url 'territory:update_territory_info' territory.id %}">
+          {% csrf_token %}
+          <label for="category" class="block mb-1 text-sm font-medium text-gray-700">카테고리</label>
+          <select name="category" id="category" class="w-full border rounded p-2 mb-4 text-sm sm:text-base">
+            {% for category in categories %}
+              <option value="{{ category.id }}" {% if category.id == territory.category.id %}selected{% endif %}>
+                {{ category.name }}
+              </option>
+            {% endfor %}
+          </select>
+
+          <div>
+            <label for="note" class="block mb-1 text-sm font-medium text-gray-700">비고</label>
+            <textarea id="note" name="note" rows="3"
+                      class="w-full p-2 border border-gray-300 rounded text-sm sm:text-base"
+                      placeholder="구역 비고 메모를 입력하세요">{{ territory.note }}</textarea>
+          </div>
+          <button type="submit"
+                  class="h-10 w-full px-4 py-1 mt-4 text-sm sm:text-base font-medium bg-green-500 rounded text-white hover:bg-blue-600 transition">
+            변경
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {% if messages %}
+    <div id="popup-message"
+         class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50
+                px-6 py-4 rounded shadow-lg text-white text-center max-w-xs w-full
+                {% for message in messages %}
+                  {% if message.tags == 'success' %} bg-green-500
+                  {% elif message.tags == 'error' %} bg-red-500
+                  {% else %} bg-gray-700
+                  {% endif %}
+                {% endfor %}">
+      {% for message in messages %}
+      {{ message }}
+      {% endfor %}
+      <button onclick="this.parentElement.remove()" class="ml-4 text-sm underline">닫기</button>
+    </div>
+    {% endif %}
+
+    <!-- 방문기록 리스트 -->
+    <div x-data="{ open: false }" class="mt-10">
+      <h3 @click="open = !open"
+          class="text-lg sm:text-xl font-semibold mb-2 cursor-pointer flex items-center justify-between">
+        🕓 방문 기록
+        <span x-text="open ? '▲ 접기' : '▼ 더보기'" class="text-sm text-blue-600 ml-2"></span>
+      </h3>
+
+      <template x-if="!open">
+        {% if visits %}
+        <ul class="divide-y divide-gray-200 bg-white rounded-lg shadow">
+          {% for visit in visits|slice:":3" %}
+          <li class="p-4">
+            <div class="flex justify-between">
+              <div>
+                <p class="text-sm text-gray-600">{{ visit.visited_at|date:"Y-m-d H:i" }}</p>
+              </div>
+              <p class="text-sm text-gray-800">{{ visit.status.label|default:"-" }}</p>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-gray-500 text-sm">방문 기록이 없습니다.</p>
+        {% endif %}
+      </template>
+
+      <div x-show="open" x-transition>
+        <ul class="divide-y divide-gray-200 bg-white rounded-lg shadow mt-2">
+          {% for visit in visits %}
+          <li class="p-4">
+            <div class="flex justify-between">
+              <div>
+                <p class="text-sm text-gray-600">{{ visit.visited_at|date:"Y-m-d H:i" }}</p>
+              </div>
+              <p class="text-sm text-gray-800">{{ visit.status.label|default:"-" }}</p>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Visit History 추가 폼 -->
+    <div class="mt-10">
+      <form method="post" class="flex flex-col sm:flex-row items-center sm:space-x-2 max-w-md mx-auto">
+        <span class="text-lg mb-2 sm:mb-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+          </svg>
+        </span>
+        {% csrf_token %}
+        <div class="flex-grow w-full sm:w-auto">
+          {% for field in form %}
+          <div>
+            {{ field }}
+            {% if field.errors %}
+            <p class="text-red-500 text-sm">{{ field.errors }}</p>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+
+        <button type="submit" class="h-10 px-4 mt-2 sm:mt-0 text-sm font-medium text-white bg-blue-500 rounded hover:bg-blue-600 whitespace-nowrap">
+          방문기록추가
+        </button>
+      </form>
+    </div>
+
+    <!-- 뒤로가기 -->
+    <div class="mt-6">
+      <a href="{% url 'territory:user_assigned_territories' %}" class="text-blue-600 hover:underline">← 내 구역 목록으로 돌아가기</a>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{% extends "base_with_tailwind.html" %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold mb-6">🛠️ 커맨드 목록</h1>
+
+  {% if commands %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    {% for command in commands %}
+      <a href="{% url command.url_name %}" class="block p-5 rounded-lg shadow hover:shadow-md transition bg-white border border-gray-200 hover:border-blue-500">
+        <h2 class="text-lg font-semibold text-blue-600 mb-2">{{ command.name }}</h2>
+        <p class="text-gray-500 text-sm">{{ command.desc|default:"설명이 없습니다." }}</p>
+      </a>
+    {% endfor %}
+  </div>
+  {% else %}
+    <p class="text-gray-500 text-sm">등록된 커맨드가 없습니다.</p>
+  {% endif %}
+</div>
+{% endblock %}

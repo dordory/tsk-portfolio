@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>📌 {{ territory.name }} - 방문 이력 추가</h2>
+  
+  <form method="post">
+    {% csrf_token %}
+    
+    <h5>✅ 방문 이력</h5>
+    {{ visit_form.as_p }}
+    
+    <hr>
+    <h5>📝 Territory 메모 수정</h5>
+    {{ note_form.as_p }}
+
+    <div class="mt-3">
+      <button type="submit" class="btn btn-primary">등록</button>
+      <a href="{% url 'territory:territory_detail' pk=territory.id %}" class="btn btn-secondary">취소</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

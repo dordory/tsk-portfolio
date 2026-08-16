@@ -1,0 +1,53 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Deck 목록</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6 sm:p-8">
+  <div class="max-w-7xl mx-auto">
+    <h2 class="text-3xl font-bold mb-8 text-gray-800">📦 Deck 목록</h2>
+
+    <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      {% for deck in decks %}
+        <a href="{% url 'territory_manager:assign_territories_to_member' deck.id %}"
+           class="group border border-gray-200 rounded-2xl shadow-lg p-6 transform transition-all duration-200 hover:scale-[1.02] hover:shadow-xl
+           {% if deck.territories.count == 0 %} bg-red-100
+           {% elif deck.territories.count <= 30 %} bg-amber-100
+           {% else %} bg-lime-100
+           {% endif %}">
+          
+          <!-- 내부 콘텐츠: 모바일 1열, sm 이상에서 4:6 비율 -->
+          <div class="grid grid-cols-1 sm:grid-cols-[4fr_6fr] gap-4 items-start">
+
+            <!-- 왼쪽 영역 (4/10) -->
+            <div class="flex items-center gap-3">
+              <div class="bg-white rounded-full p-2 shadow-inner shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" class="w-8 h-8 text-blue-600">
+                  <rect x="6" y="6" width="16" height="20" rx="2" stroke="currentColor" stroke-width="2" fill="white" />
+                  <rect x="8.5" y="4.5" width="16" height="20" rx="2" stroke="currentColor" stroke-width="2" fill="white" />
+                  <rect x="11" y="3" width="16" height="20" rx="2" stroke="currentColor" stroke-width="2" fill="white" />
+                </svg>
+              </div>
+              <h3 class="text-lg font-semibold text-blue-800 break-words">{{ deck.name }}</h3>
+            </div>
+
+            <!-- 오른쪽 영역 (6/10) -->
+            <div class="space-y-1 text-sm text-gray-700 mt-3 sm:mt-0">
+              <p>📍 전체 구역 수: <span class="font-medium">{{ deck.territories.count }}</span></p>
+              <p>👥 할당된 구역: <span class="font-medium text-green-700">{{ deck.assigned_count }}</span></p>
+              <p>🚫 미할당 구역: <span class="font-medium text-red-700">{{ deck.non_assigned_count }}</span></p>
+            </div>
+          </div>
+
+        </a>
+      {% empty %}
+        <p class="text-gray-500 col-span-full text-center">등록된 Deck이 없습니다.</p>
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>

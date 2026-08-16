@@ -1,0 +1,227 @@
+{% extends "base_with_tailwind.html" %}
+{% block title %}성경 읽기 — {{ track.title }}{% endblock %}
+{% block header %}📖 성경 읽기{% endblock %}
+
+{% block content %}
+<style>
+  /* 섹션 페이지 전환 애니메이션 (스와이프 방향에 따라 좌/우에서 들어옴) */
+  @keyframes br-slide-left  { from { opacity: .3; transform: translateX(28px);  } to { opacity: 1; transform: none; } }
+  @keyframes br-slide-right { from { opacity: .3; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+  .br-anim-left  { animation: br-slide-left  .18s ease-out; }
+  .br-anim-right { animation: br-slide-right .18s ease-out; }
+</style>
+
+<div class="max-w-lg mx-auto" id="unit-list-root"
+     data-track="{{ track.slug }}" data-initial-page="{{ next_section_index }}">
+  {% csrf_token %}
+
+  <a href="{% url 'bible_reading:track_select' %}"
+     class="inline-flex items-center gap-1 text-sm text-blue-700 mb-3">
+    ‹ 읽기 방식 선택으로
+  </a>
+
+  <div class="flex items-center gap-3 mb-1">
+    <span class="text-2xl {{ track.symbol_class }}">{{ track.symbol }}</span>
+    <h2 class="text-xl font-bold text-gray-800">{{ track.title }}</h2>
+  </div>
+
+  {# 트랙 진도 바 — toggle 응답으로 갱신 #}
+  <div class="flex items-center gap-2 mb-4">
+    <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div id="progress-bar" class="h-full rounded-full transition-all {{ track.bar_class }}"
+           style="width: {{ percent }}%"></div>
+    </div>
+    <span id="progress-text" class="text-xs text-gray-500 tabular-nums shrink-0">
+      {{ done }}&thinsp;/&thinsp;{{ total }} · {{ percent }}%
+    </span>
+  </div>
+
+  {% if next_unit %}
+  {# 다음 읽을 부분: 왼쪽(해당 행으로 이동) + 오른쪽(jw.org 본문 열기) 두 액션 #}
+  <div id="next-unit-card" data-page="{{ next_section_index }}" data-unit="{{ next_unit.id }}"
+       class="flex items-stretch bg-blue-50 border border-blue-200 rounded-xl mb-5 overflow-hidden">
+    <a href="#unit-{{ next_unit.id }}" id="next-unit-jump"
+       class="flex-1 block p-4 active:bg-blue-100 transition">
+      <p class="text-xs text-blue-600 font-semibold mb-1">다음 읽을 부분</p>
+      <p class="text-lg font-bold text-blue-900">
+        {{ next_unit.book }}{% if next_unit.chapters %} {{ next_unit.chapters }}장{% endif %}
+      </p>
+    </a>
+    <a href="{{ next_unit_url }}" target="_blank" rel="noopener"
+       class="flex flex-col items-center justify-center px-4 bg-blue-600 text-white active:bg-blue-700 transition">
+      <span class="text-lg">📖</span>
+      <span class="text-xs font-bold whitespace-nowrap">본문 읽기</span>
+    </a>
+  </div>
+  {% else %}
+  <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-5 text-center">
+    <p class="text-lg font-bold text-emerald-800">🎉 완독했습니다!</p>
+  </div>
+  {% endif %}
+
+  {# 섹션 페이지 내비게이션: ‹ 제목/점 › #}
+  <div class="flex items-center gap-2 mb-3 select-none">
+    <button type="button" id="page-prev"
+            class="w-9 h-9 shrink-0 rounded-full bg-white shadow text-gray-600 text-lg
+                   disabled:opacity-30 active:bg-gray-100">‹</button>
+    <div class="flex-1 text-center min-w-0">
+      <p id="page-title" class="text-sm font-bold text-gray-800 truncate"></p>
+      <div id="page-dots" class="flex justify-center gap-1.5 mt-1">
+        {% for section in sections %}
+        <button type="button" data-page="{{ forloop.counter0 }}"
+                class="page-dot w-2 h-2 rounded-full bg-gray-300"></button>
+        {% endfor %}
+      </div>
+    </div>
+    <button type="button" id="page-next"
+            class="w-9 h-9 shrink-0 rounded-full bg-white shadow text-gray-600 text-lg
+                   disabled:opacity-30 active:bg-gray-100">›</button>
+  </div>
+
+  {# 섹션 페이지들 — 한 번에 하나만 표시, 좌우 스와이프로 이동 #}
+  <div id="section-pages">
+    {% for section in sections %}
+    <div class="section-page hidden" data-title="{{ section.name }}">
+      <h3 class="text-sm font-bold text-white bg-orange-400 rounded-lg px-3 py-2 mb-2">
+        {{ section.name }}
+      </h3>
+      {% for book in section.books %}
+      <div class="bg-white rounded-xl shadow mb-3 overflow-hidden">
+        <p class="px-4 pt-3 pb-1 font-semibold text-gray-800">{{ book.name }}</p>
+        <ul class="divide-y divide-gray-100">
+          {% for row in book.units %}
+          <li id="unit-{{ row.unit.id }}">
+            <label class="flex items-center gap-3 px-4 py-2.5 active:bg-gray-50 cursor-pointer">
+              <input type="checkbox" class="unit-check w-5 h-5 rounded accent-emerald-600 shrink-0"
+                     data-unit-id="{{ row.unit.id }}" {% if row.read_on %}checked{% endif %}>
+              <span class="flex-1 text-gray-800">
+                {% if row.unit.marker == "israel" %}<span class="text-red-600 mr-1">♦</span>
+                {% elif row.unit.marker == "congregation" %}<span class="text-blue-600 mr-1">●</span>{% endif %}
+                {% if row.unit.chapters %}{{ row.unit.chapters }}장{% else %}전체{% endif %}
+              </span>
+              <span class="read-date text-xs text-gray-400 tabular-nums">
+                {% if row.read_on %}{{ row.read_on|date:"Y/m/d" }}{% endif %}
+              </span>
+            </label>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+      <p class="text-center text-xs text-gray-400 mb-4">← 좌우로 넘겨 다른 부분을 볼 수 있습니다 →</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+(function () {
+  const root = document.getElementById("unit-list-root");
+  const csrf = root.querySelector("[name=csrfmiddlewaretoken]").value;
+  const trackSlug = root.dataset.track;
+
+  // ---------- 섹션 페이저 ----------
+  const pages = Array.from(root.querySelectorAll(".section-page"));
+  const dots = Array.from(root.querySelectorAll(".page-dot"));
+  const prevBtn = document.getElementById("page-prev");
+  const nextBtn = document.getElementById("page-next");
+  const titleEl = document.getElementById("page-title");
+  const pagesBox = document.getElementById("section-pages");
+  let current = -1;
+
+  function show(index, direction) {
+    index = Math.max(0, Math.min(pages.length - 1, index));
+    if (index === current) return;
+    current = index;
+    pages.forEach((p, i) => {
+      p.classList.toggle("hidden", i !== index);
+      p.classList.remove("br-anim-left", "br-anim-right");
+    });
+    if (direction) {
+      pages[index].classList.add(direction === "left" ? "br-anim-left" : "br-anim-right");
+    }
+    dots.forEach((d, i) => {
+      d.classList.toggle("bg-orange-500", i === index);
+      d.classList.toggle("bg-gray-300", i !== index);
+    });
+    titleEl.textContent = pages[index].dataset.title
+      + " (" + (index + 1) + "/" + pages.length + ")";
+    prevBtn.disabled = index === 0;
+    nextBtn.disabled = index === pages.length - 1;
+  }
+
+  prevBtn.addEventListener("click", () => show(current - 1, "right"));
+  nextBtn.addEventListener("click", () => show(current + 1, "left"));
+  dots.forEach((d) => d.addEventListener("click", () => {
+    const target = Number(d.dataset.page);
+    show(target, target > current ? "left" : "right");
+  }));
+
+  // 좌우 스와이프 (세로 스크롤과 구분: 가로 이동이 충분히 크고 우세할 때만)
+  let startX = 0, startY = 0;
+  pagesBox.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  pagesBox.addEventListener("touchend", (e) => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) show(current + 1, "left");
+      else show(current - 1, "right");
+    }
+  }, { passive: true });
+
+  // 초기 페이지: 다음 읽을 부분이 있는 섹션
+  show(Number(root.dataset.initialPage) || 0);
+
+  // "다음 읽을 부분" 카드의 왼쪽 영역 → 해당 페이지로 전환 후 그 행으로 스크롤
+  // (오른쪽 "본문 읽기"는 jw.org 로 가는 일반 링크라 JS 개입 없음)
+  const nextCard = document.getElementById("next-unit-card");
+  const nextJump = document.getElementById("next-unit-jump");
+  if (nextCard && nextJump) {
+    nextJump.addEventListener("click", (e) => {
+      e.preventDefault();
+      show(Number(nextCard.dataset.page));
+      const li = document.getElementById("unit-" + nextCard.dataset.unit);
+      if (li) li.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+
+  // ---------- 읽음 체크 토글 ----------
+  root.querySelectorAll(".unit-check").forEach((box) => {
+    box.addEventListener("change", async () => {
+      box.disabled = true;
+      const body = new URLSearchParams({
+        unit_id: box.dataset.unitId,
+        checked: box.checked ? "1" : "0",
+      });
+      try {
+        const res = await fetch("{% url 'bible_reading:toggle' %}", {
+          method: "POST",
+          headers: { "X-CSRFToken": csrf },
+          body: body,
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+
+        // 읽은 날짜 표시 갱신
+        const dateEl = box.closest("label").querySelector(".read-date");
+        dateEl.textContent = data.read_on || "";
+
+        // 진도 바 갱신
+        const p = data.progress[trackSlug];
+        document.getElementById("progress-bar").style.width = p.percent + "%";
+        document.getElementById("progress-text").innerHTML =
+          p.done + " / " + p.total + " · " + p.percent + "%";
+      } catch (err) {
+        box.checked = !box.checked;  // 실패 시 원상복구
+        alert("저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      } finally {
+        box.disabled = false;
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

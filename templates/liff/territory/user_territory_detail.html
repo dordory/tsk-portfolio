@@ -1,0 +1,97 @@
+{% extends "liff/base.html" %}
+{% load tz %}
+
+{% block title %}구역 상세{% endblock %}
+
+{% block content %}
+<div class="mb-2">
+    <a href="{% url 'territory:user_assigned_territories' %}" class="text-sm text-blue-600">← 내 구역</a>
+</div>
+
+<h1 class="text-lg font-bold text-gray-900 mb-3">구역 상세</h1>
+
+{% if messages %}
+<div class="mb-3 space-y-2">
+    {% for message in messages %}
+    <div class="text-sm rounded-lg px-3 py-2
+        {% if message.tags == 'success' %}bg-green-50 text-green-700 border border-green-200
+        {% elif message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
+        {% else %}bg-gray-50 text-gray-700 border border-gray-200{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-2">
+    <p class="text-sm"><span class="text-gray-500">코드</span> · {{ territory.code }}</p>
+    <p class="text-base font-bold text-blue-800">{{ territory.address1 }} {{ territory.address2 }} {{ territory.address_detail }}</p>
+    <p class="text-sm text-gray-600">봉사자: {{ territory.assigned_to|default:territory.private_assigned_to }}</p>
+    <a href="{{ territory.map_link }}" data-external target="_blank"
+       class="mt-2 inline-block w-full text-center py-2 rounded-xl bg-blue-500 text-white text-sm font-semibold">
+        🗺️ 지도 열기
+    </a>
+</div>
+
+<!-- 카테고리 · 메모 수정 -->
+<form method="post" action="{% url 'territory:update_territory_info' territory.id %}"
+      class="mt-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+    {% csrf_token %}
+    <label for="category" class="block mb-1 text-sm font-medium text-gray-700">카테고리</label>
+    <select name="category" id="category" class="w-full border border-gray-300 rounded-lg p-2 mb-3 text-sm">
+        {% for category in categories %}
+        <option value="{{ category.id }}" {% if category.id == territory.category.id %}selected{% endif %}>
+            {{ category.name }}
+        </option>
+        {% endfor %}
+    </select>
+    <label for="note" class="block mb-1 text-sm font-medium text-gray-700">비고</label>
+    <textarea id="note" name="note" rows="3"
+              class="w-full p-2 border border-gray-300 rounded-lg text-sm"
+              placeholder="구역 비고 메모">{{ territory.note }}</textarea>
+    <button type="submit"
+            class="mt-3 w-full py-2 rounded-xl bg-green-500 text-white text-sm font-semibold">
+        변경 저장
+    </button>
+</form>
+
+<!-- 방문 기록 -->
+<div class="mt-4">
+    <h3 class="text-sm font-bold text-gray-800 mb-2">🕓 방문 기록</h3>
+    {% if visits %}
+    <ul class="divide-y divide-gray-100 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {% for visit in visits %}
+        <li class="px-4 py-3 flex justify-between">
+            <span class="text-sm text-gray-600">{{ visit.visited_at|timezone:"Asia/Tokyo"|date:"Y-m-d H:i" }}</span>
+            <span class="text-sm text-gray-800">{{ visit.status.label|default:"-" }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-gray-400">방문 기록이 없습니다.</p>
+    {% endif %}
+</div>
+
+<!-- 하단 고정 방문기록 추가 바 높이만큼 여백 확보 -->
+<div style="height: 72px;"></div>
+{% endblock %}
+
+{% block body_extra %}
+<!-- 하단 고정 방문기록 추가 (탭바 바로 위) -->
+<div class="fixed inset-x-0 bg-white/95 border-t border-gray-200 p-3"
+     style="bottom: calc(64px + env(safe-area-inset-bottom));">
+    <form method="post" class="max-w-lg mx-auto flex items-center gap-2">
+        {% csrf_token %}
+        <div class="flex-grow">
+            {% for field in form %}
+            {{ field }}
+            {% if field.errors %}<p class="text-red-500 text-xs">{{ field.errors }}</p>{% endif %}
+            {% endfor %}
+        </div>
+        <button type="submit"
+                class="shrink-0 h-10 px-4 rounded-xl bg-[#06C755] text-white text-sm font-semibold">
+            방문기록 추가
+        </button>
+    </form>
+</div>
+{% endblock %}

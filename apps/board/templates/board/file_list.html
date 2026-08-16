@@ -1,0 +1,35 @@
+{% extends "base_with_tailwind.html" %}
+{% block title %}회중게시판{% endblock %}
+{% block header %}📌 회중게시판{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+  <h2 class="text-xl font-bold text-gray-800 mb-4">게시물 목록</h2>
+
+  {% if files %}
+  <ul class="space-y-3">
+    {% for f in files %}
+    <li>
+      {# Drive 링크는 우리 세션이 필요 없으므로 외부 브라우저로 열어도 된다 #}
+      <a href="{{ f.url }}" target="_blank" rel="noopener"
+         class="block bg-white rounded-xl shadow p-4 active:bg-gray-50 transition
+                flex items-center justify-between">
+        <div class="min-w-0 flex items-center gap-3">
+          <span class="text-2xl shrink-0">{{ f.emoji }}</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-blue-800 break-words">{{ f.name }}</p>
+            <p class="text-xs text-gray-500 mt-1">
+              {{ f.kind }}{% if f.modified %} · {{ f.modified|date:"Y/m/d" }}{% endif %}
+            </p>
+          </div>
+        </div>
+        <span class="text-gray-400 text-xl ml-3">›</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-center text-gray-500 py-10">게시물이 없습니다.</p>
+  {% endif %}
+</div>
+{% endblock %}

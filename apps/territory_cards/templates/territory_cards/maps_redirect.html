@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>지도 열기</title>
+</head>
+<body>
+  <p style="font-family: sans-serif; text-align: center; margin-top: 2rem;">지도 앱으로 이동 중…</p>
+  <script>
+    // 구글맵 앱 스킴을 먼저 시도하고, 앱이 없으면(페이지가 그대로면) 웹 지도로 폴백.
+    var fallback = setTimeout(function () {
+      window.location.href = "{{ web_url|escapejs }}";
+    }, 800);
+    // 앱 전환에 성공해 페이지가 백그라운드로 가면 폴백 취소
+    // (안 하면 사파리로 돌아왔을 때 뒤늦게 웹 지도로 이동해버림).
+    addEventListener('pagehide', function () { clearTimeout(fallback); });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) clearTimeout(fallback);
+    });
+    window.location.href = "{{ app_url|escapejs }}";
+  </script>
+</body>
+</html>

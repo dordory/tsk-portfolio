@@ -1,0 +1,132 @@
+<!-- templates/territory/territories_by_congregation.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ congregation.name }}의 Territory 목록</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+</head>
+
+<body class="bg-gray-100 p-6">
+  <div class="max-w-xs mx-auto">
+
+    <h3 class="text-lg font-semibold mb-2 cursor-pointer flex items-center justify-between">📄 상세 정보</h3>
+    <div class="bg-[#fefcf7] shadow-md rounded-lg p-6">
+        <div class="space-y-3 text-gray-700">
+            <div>
+                <span class="font-semibold">코드 :</span>
+                <span class="ml-2">
+                    {{ territory.code }}
+                </span>
+            </div>
+            <div class="flex items-start">
+                <span class="font-semibold">주소 :</span>
+                <span class="ml-2">
+                    <p>{{ territory.address1 }} {{ territory.address2 }}</p>
+                    <p class="text-sm text-gray-600">{{ territory.address_detail }}</p>
+                </span>
+            </div>
+            <p>
+                <span class="font-semibold">분류 :</span>
+                <span class="ml-2">{{ territory.category.name|default:"없음" }}</span>
+            </p>
+            <div class="mt-10">
+                <form method="post" action="{% url 'territory:update_note' territory.pk %}" class="space-y-2">
+                    {% csrf_token %}
+                    <textarea name="note" rows="3" class="w-full border rounded p-2 text-sm text-gray-700">{{ territory.note }}</textarea>
+                    <div class="text-right">
+                        <button type="submit"
+                            class="h-10 w-full px-4 py-1 text-sm font-medium text-white bg-green-500 rounded hover:bg-green-600">
+                            메모 저장
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ Visit History 리스트 -->
+    <div x-data="{ open: false }" class="mt-10">
+        <!-- 🔻 제목 및 토글 -->
+        <h3 @click="open = !open" class="text-lg font-semibold mb-2 cursor-pointer flex items-center justify-between">
+            🕓 방문 기록
+            <span x-text="open ? '▲ 접기' : '▼ 더보기'" class="text-sm text-blue-600 ml-2"></span>
+        </h3>
+
+        <!-- 🔹 접힌 상태: 최근 3건 -->
+        <template x-if="!open">
+            {% if visits %}
+            <ul class="divide-y divide-gray-200 bg-white rounded-lg shadow">
+                {% for visit in visits|slice:":3" %}
+                <li class="p-4">
+                    <div class="flex justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">{{ visit.visited_at|date:"Y-m-d H:i" }}</p>
+                        </div>
+                        <p class="text-sm text-gray-800">{{ visit.status.label|default:"-" }}</p>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-gray-500 text-sm">방문 기록이 없습니다.</p>
+            {% endif %}
+        </template>
+
+        <!-- 🔹 펼친 상태: 전체 리스트 -->
+        <div x-show="open" x-transition>
+            <ul class="divide-y divide-gray-200 bg-white rounded-lg shadow mt-2">
+                {% for visit in visits %}
+                <li class="p-4">
+                    <div class="flex justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">{{ visit.visited_at|date:"Y-m-d H:i" }}</p>
+                        </div>
+                        <p class="text-sm text-gray-800">{{ visit.status.label|default:"-" }}</p>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <!-- ✅ Visit History 추가 폼 -->
+    <div class="mt-10">
+        <form method="post" class="flex items-center space-x-2 max-w-md mx-auto">
+            <span class="text-lg">
+                <!-- 아이콘 추가 -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                </svg>
+            </span>
+            {% csrf_token %}
+            <div class="flex-grow">
+                {% for field in form %}
+                    <div>
+                        {{ field }}
+                        {% if field.errors %}
+                            <p class="text-red-500 text-sm">{{ field.errors }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+
+            <button type="submit" class="h-10 px-4 text-sm font-medium text-white bg-blue-500 rounded hover:bg-blue-600 whitespace-nowrap">
+                방문기록추가
+            </button>
+        </form>
+    </div>
+
+    <!-- ✅ 돌아가기 링크 -->
+    <div class="mt-10 text-center">
+        <a href="{% url 'territory:congregation_territories' territory.congregation.pk %}" class="text-blue-600 hover:underline">
+            ← 구역 목록으로 돌아가기
+        </a>
+    </div>
+
+  </div>
+</body>
+</html>

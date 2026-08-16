@@ -1,0 +1,68 @@
+<!-- territory/territory_list.html -->
+
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+
+  <h2>Territory 목록</h2>
+
+  <form method="get" class="form-inline mb-3">
+    <label for="per_page">표시 개수:</label>
+    <select name="per_page" id="per_page" class="form-control mx-2" onchange="this.form.submit()">
+      <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+      <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+      <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+    </select>
+  </form>
+
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>코드</th>
+        <th>주소</th>
+        <th>메모</th>
+        <th>마지막 방문</th>
+        <th>상세보기</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for territory in page_obj %}
+      <tr>
+        <td>{{ territory.code }}</td>
+        <td>{{ territory.address1 }} {{ territory.address2 }}</td>
+        <td>{{ territory.note }}</td>
+        <td>{% if territory.last_visit %}
+                {{ territory.last_visit.visited_at|date:"Y-m-d H:i" }} {{ territory.last_visit.status }}
+            {% else %}
+                -
+            {% endif %}
+        </td>
+        <td>{{ territory.congregation.name }}</td>
+        <td><a href="{% url 'territory:territory_detail' territory.id %}">보기</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <nav>
+    <ul class="pagination">
+      {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}&per_page={{ per_page }}">이전</a>
+        </li>
+      {% endif %}
+
+      <li class="page-item disabled">
+        <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      </li>
+
+      {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.next_page_number }}&per_page={{ per_page }}">다음</a>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+
+</div>
+{% endblock %}
