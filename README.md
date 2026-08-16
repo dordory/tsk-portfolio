@@ -92,3 +92,7 @@ With LINE/Google variables left empty and `DEBUG=True`, the app runs in a **deve
 - UI text is Korean (the app serves a Korean-speaking congregation in Tokyo); timezone is `Asia/Tokyo`.
 - Tests (269) cover the pure sheet-mapping logic, LINE token verification (mocked), write guards, caching/invalidation, bot keyword routing, scripture parsing/settlement math, and template rendering: `python manage.py test`.
 - The quiz app ships with generated **sample cards**; the real card images are copyrighted material and are excluded from this public snapshot.
+
+## License
+
+[MIT License](LICENSE)
