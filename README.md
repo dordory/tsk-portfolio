@@ -32,6 +32,9 @@ Children post “\<scripture\> 읽음” (“I read \<scripture\>”) in the gro
 **Web/LIFF dual rendering.**
 A middleware flags LIFF sessions (`request.is_liff`); a template-resolution helper prefers `liff/<name>` templates when present and falls back to the standard ones, letting one view serve both the in-app WebView and regular browsers.
 
+**Korean-first UI with an opt-in English locale.**
+The congregation is Korean-speaking, so Korean stays the source language (msgids) and English lives in `locale/en` — flipping the base language would push every Korean string into a translation file and destabilize hundreds of Korean test assertions for no user benefit. Language selection is deliberately **explicit only** (`?lang=en`, persisted in a cookie) via a tiny middleware instead of Django's `LocaleMiddleware`: a member whose phone is set to Japanese or English must still see the Korean UI. Sheet data (assignee labels, visit statuses) is content, not UI, and is never translated. A catalog test fails the build on any untranslated string or mismatched placeholder.
+
 **Real-world deployment quirks solved.**
 Runs on PythonAnywhere behind its mandatory outbound proxy — including the subtle failure where `httplib2` *silently ignores* proxy settings when PySocks is missing (the fix is codified in `requirements.txt` and an explicit proxy injection in `sheets.py`).
 
@@ -80,6 +83,8 @@ python manage.py runserver
 
 With LINE/Google variables left empty and `DEBUG=True`, the app runs in a **development bypass-login mode** (pick a member directly) so the UI can be explored without any external accounts.
 
+The UI is Korean by default; append `?lang=en` to any URL for the English locale (territory-card, Bible-reading and sign-in screens are translated; the choice is remembered in a cookie).
+
 ### Key environment variables
 
 | Variable | Purpose |
@@ -95,7 +100,7 @@ With LINE/Google variables left empty and `DEBUG=True`, the app runs in a **deve
 ## Notes
 
 - UI text is Korean (the app serves a Korean-speaking congregation in Tokyo); timezone is `Asia/Tokyo`.
-- Tests (417) cover the pure sheet-mapping logic, LINE token verification (mocked), write guards, caching/invalidation, the coordinate cache, bot keyword routing and help completeness, invite-code flows, family-scoped permissions, scripture parsing/settlement math, and template rendering: `python manage.py test`.
+- Tests (424) cover the pure sheet-mapping logic, LINE token verification (mocked), write guards, caching/invalidation, the coordinate cache, bot keyword routing and help completeness, invite-code flows, family-scoped permissions, scripture parsing/settlement math, language switching and translation-catalog completeness, and template rendering: `python manage.py test`.
 - The quiz app ships with generated **sample cards**; the real card images are copyrighted material and are excluded from this public snapshot.
 
 ## License
