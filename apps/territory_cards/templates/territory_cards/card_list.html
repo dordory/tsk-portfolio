@@ -10,7 +10,9 @@
   <ul class="space-y-3">
     {% for card in cards %}
     <li>
+      {# data-warm: 탭 목록 캐시가 살아 있어 빠른 전환이 예상되는 카드 — 스피너 생략 #}
       <a href="{% url 'territory_cards:tab_list' card.spreadsheet_id %}"
+         {% if card.warm %}data-warm="1"{% endif %}
          class="block bg-white rounded-xl shadow p-4 active:bg-gray-50 transition
                 flex items-center justify-between">
         <div class="min-w-0">

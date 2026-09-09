@@ -50,6 +50,34 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS")
 SECURE_PROXY_SSL_HEADER = ['HTTP_X_FORWARDED_PROTO', 'https']
 
 # ─────────────────────────────────────────────────────────────
+# 로깅 — apps.* 로거를 콘솔로 출력한다.
+# 파이썬 로그 레벨은 Django DEBUG 와 별개라, LOGGING 설정이 없으면 INFO/DEBUG 는
+# 어디에도 안 나온다(WARNING 이상만 최후 수단 핸들러로 stderr).
+# 레벨 기본값: DEBUG=True(개발/테스트머신) → DEBUG (Google API 호출별 소요시간
+# 계측까지 보임), DEBUG=False(PA 운영) → INFO (저빈도 알림만).
+# 운영 중 진단이 필요하면 DEBUG 를 켤 필요 없이 .env 의 LOG_LEVEL 만 조정한다
+# (예: LOG_LEVEL=DEBUG → 계측 출력).
+# ─────────────────────────────────────────────────────────────
+LOG_LEVEL = env("LOG_LEVEL", default=("DEBUG" if DEBUG else "INFO"))
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "app": {
+            "format": "[{asctime}] {levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "app"},
+    },
+    "loggers": {
+        "apps": {"handlers": ["console"], "level": LOG_LEVEL},
+    },
+}
+
+# ─────────────────────────────────────────────────────────────
 # LINE MINI App / LIFF 연동 설정
 # 시크릿은 코드에 두지 말고 환경변수로 주입한다.
 #   LINE_LIFF_ID      : 프론트(LIFF SDK)에서 사용하는 LIFF ID
@@ -101,6 +129,12 @@ GOOGLE_SERVICE_ACCOUNT_FILE = env('GOOGLE_SERVICE_ACCOUNT_FILE', default='')
 GOOGLE_SERVICE_ACCOUNT_JSON = env('GOOGLE_SERVICE_ACCOUNT_JSON', default='')
 TERRITORY_CARDS_MASTER_SHEET_ID = env('TERRITORY_CARDS_MASTER_SHEET_ID', default='')
 
+# 구역 전체 지도(주소 일괄 표시)용 Google Maps JavaScript API 키.
+# 브라우저에 노출되는 키이므로 GCP 콘솔에서 HTTP 리퍼러 제한 필수.
+# 지오코딩도 클라이언트측(Geocoder)이라 서버(PA 프록시) 제약을 받지 않는다.
+# 미설정이면 지도 화면이 안내 메시지로 대체된다(다른 화면은 영향 없음).
+GOOGLE_MAPS_API_KEY = env('GOOGLE_MAPS_API_KEY', default='')
+
 # ─────────────────────────────────────────────────────────────
 # board (회중게시판 = 구글드라이브 폴더) 연동 설정
 # 위와 같은 서비스 계정으로 Drive API(메타데이터 읽기 전용)에 접근한다.
@@ -141,6 +175,7 @@ INSTALLED_APPS = [
     'apps.deck',
     'apps.manager',
     'apps.line',
+    'apps.messenger',
     'apps.territory_cards',
     'apps.board',
     'apps.home',

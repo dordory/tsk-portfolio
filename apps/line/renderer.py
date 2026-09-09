@@ -24,7 +24,17 @@ def render(reply):
         return [flex_menu.build_stamp_card_message(
             reply.name, reply.year, reply.month,
             reply.checked_days, reply.today_day, reply.streak,
+            manage_url=(flex_menu.resolve_link(reply.manage_path)
+                        if reply.manage_path else None),
         )]
     if isinstance(reply, replies.ReportReply):
         return [flex_menu.build_report_message(reply.sections)]
+    if isinstance(reply, replies.HelpReply):
+        return [flex_menu.build_help_message(reply.sections, reply.footer)]
+    if isinstance(reply, replies.ImageReply):
+        return [{
+            "type": "image",
+            "originalContentUrl": reply.image_url,
+            "previewImageUrl": reply.image_url,
+        }]
     raise TypeError(f"렌더러가 모르는 응답 타입: {type(reply).__name__}")

@@ -12,7 +12,7 @@
      })">
 
   <div class="mb-4 flex items-center justify-between">
-    <a href="{% url 'territory_cards:address_list' card.spreadsheet_id gid %}{% if view_only %}?view=1{% endif %}"
+    <a href="{% url 'territory_cards:address_list' card.spreadsheet_id gid %}{% if view_only %}?view=1{% endif %}" data-warm="1"
        class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg shadow-md hover:bg-indigo-700 active:scale-95 transition">
       <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
@@ -28,7 +28,8 @@
   <!-- 기본 정보 -->
   <div class="bg-white rounded-xl shadow p-4 space-y-2">
     {# 지역명(A열) + 번지. 예: サンプル区見本町1-1-3 #}
-    <h2 class="text-lg font-bold text-blue-800">{{ row.address }}</h2>
+    {# 시트 행번호 배지 — 주소 목록의 배지와 같은 번호(시트 직접 열람자와의 대화용) #}
+    <h2 class="text-lg font-bold text-blue-800">{{ row.address }} <span class="inline-block align-middle px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] font-mono font-medium text-gray-500">시트 {{ row.row }}행</span></h2>
     {% if row.bldg %}<p class="text-gray-800">{{ row.bldg }}</p>{% endif %}
 
     <div class="flex items-center gap-4 pt-1 text-sm">
@@ -114,7 +115,7 @@
       <p class="text-4xl">⚠️</p>
       <h3 class="text-lg font-bold text-gray-800">저장하지 못했습니다</h3>
       <p class="text-sm text-gray-600 leading-relaxed" x-text="mismatchMsg"></p>
-      <a href="{% url 'territory_cards:address_list' card.spreadsheet_id gid %}"
+      <a href="{% url 'territory_cards:address_list' card.spreadsheet_id gid %}" data-warm="1"
          class="block w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold text-sm active:bg-indigo-700 shadow-md transition">
         주소 목록으로 돌아가기
       </a>

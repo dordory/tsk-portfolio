@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
-from django.db.models import Max, Q
+from django.db.models import Exists, Max, OuterRef, Q
 from zoneinfo import ZoneInfo
 from django.views.decorators.http import require_POST
 
@@ -14,30 +14,32 @@ from datetime import timedelta, datetime
 
 from .models import Territory, VisitHistory, Congregation, TerritoryCategory
 from apps.member.models import Member, Group
-from apps.line.services import (
-    LineTokenError,
-    link_line_to_member,
+from apps.messenger.services import (
+    LinkError,
+    link_account,
     check_link_code,
     consume_link_code,
     PENDING_SESSION_KEY,
 )
+from apps.messenger.models import MessengerAccount, PROVIDER_LINE
 from apps.line.template_helpers import liff_template_names
 from .forms import VisitHistoryForm, TerritoryNoteForm
 from .forms import InlineVisitHistoryForm  # 이 폼을 따로 만들어야 합니다
 
 
 # ─────────────────────────────────────────────────────────────
-# LINE 로그인 / 온보딩
+# 메신저 로그인 / 온보딩 (공용 흐름 — 현재 어댑터는 LINE)
 #
-# 인증은 LINE 계정으로 통일한다(웹·미니앱 공통). member_id 를 URL 로 넘기던
+# 인증은 메신저 계정으로 통일한다(웹·미니앱 공통). member_id 를 URL 로 넘기던
 # 방식은 폐기하고 request.user 로 인가한다.
 #
-# 로그인/토큰검증은 apps.line 이 담당한다(line:entry, line:login).
-#   - 연결된 LineProfile 이 있으면 line:login 이 바로 세션 로그인.
-#   - 없으면 검증정보를 세션(PENDING_SESSION_KEY)에 저장하고 아래 온보딩으로.
+# 토큰검증은 어댑터 앱(apps.line 의 line:entry, line:login)이 담당한다.
+#   - 연결된 MessengerAccount 가 있으면 어댑터가 바로 세션 로그인.
+#   - 없으면 검증정보를 세션(messenger.PENDING_SESSION_KEY, provider 포함)에
+#     저장하고 아래 공용 온보딩으로.
 #
 # 온보딩(그룹→멤버 선택)에서 본인 멤버를 고르면 link_member 가
-# LineProfile 을 생성해 연결하고 로그인한다.
+# MessengerAccount 를 생성해 연결하고 로그인한다.
 # LINE 미설정 + DEBUG 환경에서는 개발용 우회 로그인(멤버 직접 선택)을 허용한다.
 # ─────────────────────────────────────────────────────────────
 
@@ -92,16 +94,21 @@ def user_login_view(request):
         return redirect(reverse("territory:user_groups"))
 
     group = get_object_or_404(Group, id=group_id)
+    # 온보딩 중인 프로바이더에 이미 연결된 멤버만 잠근다 — 다른 프로바이더
+    # 연결은 무관(LINE 연결済 멤버도 카카오 온보딩은 가능해야 한다).
+    provider = (pending or {}).get("provider", PROVIDER_LINE)
     members = (
         Member.active_only.filter(group_id=group_id)
-        .select_related("line_profile")
+        .annotate(already_linked=Exists(
+            MessengerAccount.objects.filter(member=OuterRef("pk"), provider=provider)
+        ))
         .order_by("name")
     )
     return render(request, "territory/login.html", {
         "members": members,
         "group_id": group_id,
         "group": group,
-        # LINE 온보딩(pending)일 때만 이미 연결된 멤버를 잠근다.
+        # 온보딩(pending)일 때만 이미 연결된 멤버를 잠근다.
         # 개발용 우회 로그인에서는 아무 멤버로나 들어갈 수 있어야 한다.
         "onboarding": bool(pending),
     })
@@ -116,8 +123,9 @@ CODE_MAX_ATTEMPTS = 5
 def link_member(request):
     """
     선택한 멤버로 로그인한다.
-    - LINE 온보딩: 이름 선택 → 초대코드 입력(본인 확인) → LineProfile 연결 후 로그인.
-      코드 없이 POST 되면 코드 입력 화면을 보여주고, 코드가 맞아야 연결한다.
+    - 메신저 온보딩: 이름 선택 → 초대코드 입력(본인 확인) → MessengerAccount
+      연결 후 로그인. 코드 없이 POST 되면 코드 입력 화면을 보여주고,
+      코드가 맞아야 연결한다. (프로바이더는 pending 세션이 지정 — 현재 LINE)
     - 개발용 우회 로그인(LINE 미설정 + DEBUG): 코드 없이 바로 로그인.
     """
     if request.user.is_authenticated:
@@ -151,20 +159,26 @@ def link_member(request):
             })
 
         try:
-            link_line_to_member(
+            link_account(
                 member,
-                line_user_id=pending["sub"],
+                provider=pending.get("provider", PROVIDER_LINE),
+                provider_user_id=pending["sub"],
                 display_name=pending.get("name", ""),
                 picture_url=pending.get("picture", ""),
             )
-        except LineTokenError as exc:
+        except LinkError as exc:
             messages.error(request, f"{exc} 관리자에게 문의하세요.")
             return redirect("territory:user_home")
         consume_link_code(member)
-        # LINE 앱 안(In-Client)에서 시작한 온보딩이면 미니앱 UI 로 분기.
+        # 메신저 앱 안(In-Client)에서 시작한 온보딩이면 미니앱 UI 로 분기.
         request.session["is_liff"] = bool(pending.get("in_client"))
+        # 온보딩을 시작시킨 딥링크(어댑터가 검증해 실어둔 next) — 있으면
+        # 연결 완료 후 처음 탭한 타일의 목적지로 착지한다.
+        next_path = pending.get("next") or ""
         request.session.pop(PENDING_SESSION_KEY, None)
         request.session.pop(CODE_ATTEMPTS_SESSION_KEY, None)
+        _login_member(request, member)
+        return redirect(next_path or settings.LOGIN_REDIRECT_URL)
     elif not settings.LINE_DEV_LOGIN:
         # LINE 미설정이 아닌데 pending 도 없으면 정상 경로가 아니다.
         return redirect("territory:user_home")

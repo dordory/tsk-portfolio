@@ -1,7 +1,7 @@
 """
 성경 읽기 계획표 화면.
 
-신원은 Member/LineProfile(LIFF 로그인)을 재사용하고, 진도는 DB
+신원은 Member/MessengerAccount(LIFF 로그인)을 재사용하고, 진도는 DB
 (ReadingProgress)에 저장한다. 계획표 데이터는 plan_data 모듈이 소스.
 """
 

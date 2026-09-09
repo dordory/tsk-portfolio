@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase, override_settings
 
-from apps.line.services import link_line_to_member
+from apps.messenger.services import link_account
 
 from . import mapping, sheets
 from .sheets import SheetsApiError, SheetRowMismatch
@@ -46,6 +46,50 @@ class ExecuteWrapperTests(SimpleTestCase):
         req.execute.side_effect = ValueError("bug in our code")
         with self.assertRaises(ValueError):
             sheets.execute(req)
+
+    def test_timing_logged_at_debug(self):
+        # 호출별 소요시간 계측 — DEBUG 레벨(LOG_LEVEL 로 운영 중 조정 가능).
+        req = mock.Mock()
+        req.methodId = "sheets.spreadsheets.values.batchGet"
+        req.execute.return_value = {}
+        with self.assertLogs("apps.territory_cards.sheets", level="DEBUG") as logs:
+            sheets.execute(req)
+        self.assertTrue(
+            any("values.batchGet" in m and "ms" in m for m in logs.output), logs.output
+        )
+
+
+class SharedCredentialsTests(SimpleTestCase):
+    """_get_credentials — 프로세스 공유(스레드 간 1회 생성), 실패는 캐시하지 않음."""
+
+    def setUp(self):
+        sheets._shared_creds = None
+        self.addCleanup(setattr, sheets, "_shared_creds", None)
+
+    def test_created_once_and_shared_across_threads(self):
+        import threading
+
+        with mock.patch.object(sheets, "_load_credentials",
+                               return_value=mock.Mock()) as load:
+            first = sheets._get_credentials()
+            second = sheets._get_credentials()
+            results = []
+            t = threading.Thread(target=lambda: results.append(sheets._get_credentials()))
+            t.start()
+            t.join()
+        self.assertIs(first, second)
+        self.assertIs(first, results[0])  # 새 스레드(=dev 서버의 새 요청)도 재사용
+        load.assert_called_once()
+
+    def test_failure_not_cached(self):
+        # 설정 누락으로 실패한 결과가 눌러앉으면 .env 수정 후에도 계속 실패한다.
+        boom = sheets.SheetsConfigError("자격증명 없음")
+        with mock.patch.object(sheets, "_load_credentials",
+                               side_effect=[boom, mock.Mock()]) as load:
+            with self.assertRaises(sheets.SheetsConfigError):
+                sheets._get_credentials()
+            self.assertIsNotNone(sheets._get_credentials())  # 재시도는 성공
+        self.assertEqual(load.call_count, 2)
 
 
 class ResolveTabTitleTests(SimpleTestCase):
@@ -407,14 +451,14 @@ class AssigneeNameTests(TestCase):
         return SimpleNamespace(user=self.member)
 
     def test_db_name_wins_over_line_display_name(self):
-        link_line_to_member(self.member, "U-1", display_name="라인닉네임")
+        link_account(self.member, "line", "U-1", display_name="라인닉네임")
         self.member.refresh_from_db()
         self.assertEqual(_assignee_name(self._request()), "홍길동")
 
     def test_line_display_name_as_fallback(self):
         self.member.name = ""
         self.member.save(update_fields=["name"])
-        link_line_to_member(self.member, "U-1", display_name="라인닉네임")
+        link_account(self.member, "line", "U-1", display_name="라인닉네임")
         self.assertEqual(_assignee_name(self._request()), "라인닉네임")
 
     def test_username_as_last_resort(self):
@@ -484,6 +528,52 @@ class ViewOnlyModeTests(TestCase):
         self.assertContains(res, "이미 다른 사람에게 할당된 구역입니다")
         self.assertContains(res, "/cards/SID/1/?view=1")
 
+    # ── enter_tab 이름 텍스트 박스: 기본값 = J2 현재 이름, 없으면 내 이름. 수정해서 기록 가능 ──
+    def _patch_set_assignee(self):
+        from unittest import mock
+        from . import sheets
+        p = mock.patch.object(sheets, "set_assignee", side_effect=lambda sid, title, name: None)
+        p.start()
+        self.addCleanup(p.stop)
+        return sheets.set_assignee
+
+    def test_notice_screen_defaults_to_my_name_without_name_in_message(self):
+        res = self.client.post("/cards/SID/1/enter/")
+        self.assertContains(res, 'name="assignee" value="홍길동"')
+        self.assertNotContains(res, "이름(")  # 안내문에서 이름 제거
+
+    def test_warning_screen_defaults_to_current_assignee(self):
+        from . import sheets
+        sheets.read_assignee.side_effect = lambda sid, title: "다른사람"
+        res = self.client.post("/cards/SID/1/enter/")
+        self.assertContains(res, 'name="assignee" value="다른사람"')
+        self.assertContains(res, "현재 임명받은 전도인이 기록되어 있습니다")
+        self.assertNotContains(res, "현재 임명받은 전도인:")
+
+    def test_confirm_writes_posted_name(self):
+        set_assignee = self._patch_set_assignee()
+        res = self.client.post("/cards/SID/1/enter/", {"confirm": "1", "assignee": " 다른사람, 홍길동 "})
+        self.assertRedirects(res, "/cards/SID/1/", fetch_redirect_response=False)
+        set_assignee.assert_called_once_with("SID", "1", "다른사람, 홍길동")
+
+    def test_confirm_with_blank_name_falls_back_to_my_name(self):
+        set_assignee = self._patch_set_assignee()
+        self.client.post("/cards/SID/1/enter/", {"confirm": "1", "assignee": "   "})
+        set_assignee.assert_called_once_with("SID", "1", "홍길동")
+
+    def test_confirm_without_name_field_uses_my_name(self):
+        set_assignee = self._patch_set_assignee()
+        self.client.post("/cards/SID/1/enter/", {"confirm": "1"})
+        set_assignee.assert_called_once_with("SID", "1", "홍길동")
+
+    def test_confirm_with_unchanged_current_name_skips_write(self):
+        from . import sheets
+        sheets.read_assignee.side_effect = lambda sid, title: "다른사람"
+        set_assignee = self._patch_set_assignee()
+        res = self.client.post("/cards/SID/1/enter/", {"confirm": "1", "assignee": "다른사람"})
+        self.assertRedirects(res, "/cards/SID/1/", fetch_redirect_response=False)
+        set_assignee.assert_not_called()
+
     # ── 주소 목록 ──
     def test_address_list_view_only(self):
         res = self.client.get("/cards/SID/1/?view=1")
@@ -494,6 +584,57 @@ class ViewOnlyModeTests(TestCase):
         res = self.client.get("/cards/SID/1/")
         self.assertNotContains(res, "열람 모드")
         self.assertContains(res, "/cards/SID/1/row/5/")
+
+    # ── 시트 행번호 표시 — 시트 직접 열람자와 같은 번호로 대화하기 위한 배지 ──
+    def test_address_list_shows_sheet_row_number(self):
+        res = self.client.get("/cards/SID/1/")
+        self.assertContains(res, "5행")
+
+    def test_row_detail_shows_sheet_row_number(self):
+        res = self.client.get("/cards/SID/1/row/5/")
+        self.assertContains(res, "시트 5행")
+
+    # ── 구역 전체 지도 ──
+    def test_address_list_has_map_button(self):
+        res = self.client.get("/cards/SID/1/")
+        self.assertContains(res, "/cards/SID/1/map/")
+
+    def test_map_without_api_key_shows_notice(self):
+        with self.settings(GOOGLE_MAPS_API_KEY=""):
+            res = self.client.get("/cards/SID/1/map/")
+        self.assertContains(res, "지도 기능이 아직 설정되지 않았습니다")
+        self.assertNotContains(res, "maps.googleapis.com")
+
+    def test_map_renders_points_and_sdk(self):
+        with self.settings(GOOGLE_MAPS_API_KEY="TESTKEY"):
+            res = self.client.get("/cards/SID/1/map/")
+        # 주소 JSON(json_script)에 지오코딩 쿼리(도쿄 접두)와 행 정보가 실린다.
+        # json_script 는 비ASCII 를 \uXXXX 로 이스케이프한다.
+        self.assertContains(res, "map-points")
+        s_query = r"\u6771\u4eac\u90fd\u898b\u672c\u753a1-2-3"  # 東京都見本町1-2-3
+        self.assertContains(res, s_query)
+        self.assertContains(res, "/cards/SID/1/row/5/")
+        self.assertContains(res, "maps.googleapis.com/maps/api/js?key=TESTKEY")
+
+    def test_map_has_row_number_pin_and_locate_button(self):
+        with self.settings(GOOGLE_MAPS_API_KEY="TESTKEY"):
+            res = self.client.get("/cards/SID/1/map/")
+        self.assertContains(res, '"row": 5')   # 핀 라벨용 행번호가 JSON 에 실린다
+        self.assertContains(res, "내 위치")
+
+    def test_map_has_quota_alert_handlers(self):
+        """일일 한도 도달 시 사용자에게 배너로 알린다(침묵 금지)."""
+        with self.settings(GOOGLE_MAPS_API_KEY="TESTKEY"):
+            res = self.client.get("/cards/SID/1/map/")
+        self.assertContains(res, "map-alert")
+        self.assertContains(res, "gm_authFailure")   # 지도 로드 한도/키 문제
+        self.assertContains(res, "일일 한도 도달")     # 지오코딩 한도 중단 처리
+
+    def test_map_view_only_propagates(self):
+        with self.settings(GOOGLE_MAPS_API_KEY="TESTKEY"):
+            res = self.client.get("/cards/SID/1/map/?view=1")
+        self.assertContains(res, "/cards/SID/1/row/5/?view=1")
+        self.assertContains(res, "/cards/SID/1/?view=1")
 
     # ── 상세 화면 ──
     def test_row_detail_view_only_hides_edit_ui(self):
@@ -513,9 +654,16 @@ class ViewOnlyModeTests(TestCase):
     def test_no_template_comment_leak(self):
         # Django {# #} 주석은 한 줄 전용 — 여러 줄로 쓰면 본문에 그대로 노출된다
         # (실제 사고 2건). 렌더링 결과에 주석 여는 기호가 보이면 실패.
-        for url in ("/cards/SID/1/", "/cards/SID/1/row/5/"):
-            res = self.client.get(url)
-            self.assertNotContains(res, "{#", msg_prefix=url)
+        with self.settings(GOOGLE_MAPS_API_KEY="TESTKEY"):  # 지도 본문 분기까지 렌더
+            for url in ("/cards/SID/1/", "/cards/SID/1/row/5/", "/cards/SID/1/map/"):
+                res = self.client.get(url)
+                self.assertNotContains(res, "{#", msg_prefix=url)
+
+    def test_nav_loading_overlay_in_base(self):
+        # 페이지 이동 중 로딩 스피너(전역 base) — 다음 화면을 기다리는 동안의 시각 표시.
+        res = self.client.get("/cards/SID/1/")
+        self.assertContains(res, 'id="nav-loading"')
+        self.assertContains(res, "animate-spin")
 
 
 class ReleaseTabTests(TestCase):
@@ -598,3 +746,504 @@ class ReleaseTabTests(TestCase):
         res = self.client.get("/cards/SID/1/?view=1")
         self.assertNotContains(res, "반납하고 구역선택으로")
         self.assertNotContains(res, "/cards/SID/1/release/")
+
+    # ── 공동 봉사 표기('다른사람, 홍길동'): 내 이름이 포함되면 본인 — 반납은 J2 전체 초기화 ──
+    def test_release_allowed_when_co_assigned_and_clears_whole_cell(self):
+        from . import sheets
+        sheets.read_assignee.side_effect = lambda sid, title: "다른사람, 홍길동"
+        res = self.client.post("/cards/SID/1/release/")
+        sheets.set_assignee.assert_called_once_with("SID", "1", "")
+        self.assertRedirects(res, "/cards/SID/", fetch_redirect_response=False)
+
+    def test_address_list_shows_release_button_when_co_assigned(self):
+        from . import sheets
+        sheets.read_tab_rows.side_effect = lambda sid, title: {
+            "assignee": "다른사람, 홍길동", "end_row": 10,
+            "rows": [dict(ViewOnlyModeTests.ROW)],
+        }
+        res = self.client.get("/cards/SID/1/")
+        self.assertContains(res, "/cards/SID/1/release/")
+
+    def test_enter_tab_auto_enters_when_co_assigned(self):
+        from . import sheets
+        sheets.read_assignee.side_effect = lambda sid, title: "다른사람, 홍길동"
+        res = self.client.post("/cards/SID/1/enter/")
+        self.assertRedirects(res, "/cards/SID/1/", fetch_redirect_response=False)
+        sheets.set_assignee.assert_not_called()
+
+
+class AssigneeIncludesTests(SimpleTestCase):
+    """공동 봉사 표기에서 '내 이름 포함' 판정(순수 로직) — 자동 진입·반납 허용·버튼 표시 공용."""
+
+    def test_exact_match(self):
+        self.assertTrue(mapping.assignee_includes("홍길동", "홍길동"))
+
+    def test_separators(self):
+        for cell in ["다른사람, 홍길동", "홍길동,다른사람", "다른사람/홍길동", "다른사람·홍길동",
+                     "다른사람、홍길동", "다른사람 홍길동"]:
+            self.assertTrue(mapping.assignee_includes(cell, "홍길동"), cell)
+
+    def test_no_substring_match(self):
+        self.assertFalse(mapping.assignee_includes("홍길동", "홍길"))
+        self.assertFalse(mapping.assignee_includes("김홍길동", "홍길동"))
+
+    def test_empty(self):
+        self.assertFalse(mapping.assignee_includes("", "홍길동"))
+        self.assertFalse(mapping.assignee_includes("홍길동", ""))
+        self.assertFalse(mapping.assignee_includes(None, "홍길동"))
+
+    def test_name_with_space_exact(self):
+        self.assertTrue(mapping.assignee_includes("홍길동 洪吉童", "홍길동 洪吉童"))
+        self.assertTrue(mapping.assignee_includes("홍길동 洪吉童", "홍길동"))
+
+
+class GeoCoordsMappingTests(SimpleTestCase):
+    """지오코딩 쿼리(DB 좌표캐시의 키) 순수 로직."""
+
+    def test_build_geo_query_adds_tokyo_prefix(self):
+        self.assertEqual(mapping.build_geo_query("見本町1-2-3"), "東京都見本町1-2-3")
+        self.assertEqual(mapping.build_geo_query("東京都見本町1-2-3"), "東京都見本町1-2-3")
+        self.assertEqual(mapping.build_geo_query("  "), "")
+
+
+class SaveCoordsViewTests(TestCase):
+    """save_coords 뷰 — JSON 배치를 DB 좌표캐시(GeocodedAddress)에 저장(시트 무관)."""
+
+    URL = "/cards/SID/map/coords/"
+
+    def setUp(self):
+        self.member = get_user_model().objects.create_user(
+            username="tester", password="pw", name="홍길동", gender="d"
+        )
+        self.client.force_login(self.member)
+
+    def _post(self, payload):
+        import json
+        return self.client.post(
+            self.URL, json.dumps(payload), content_type="application/json"
+        )
+
+    def test_valid_items_saved_to_db(self):
+        from .models import GeocodedAddress
+
+        res = self._post({"items": [
+            {"query": "東京都見本町1-2-3", "lat": 35.7, "lng": 139.7},
+        ]})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"ok": True, "saved": 1})
+        row = GeocodedAddress.objects.get(query="東京都見本町1-2-3")
+        self.assertEqual((row.lat, row.lng), (35.7, 139.7))
+
+    def test_same_query_updates_not_duplicates(self):
+        from .models import GeocodedAddress
+
+        self._post({"items": [{"query": "東京都見本町1-2-3", "lat": 35.7, "lng": 139.7}]})
+        self._post({"items": [{"query": "東京都見本町1-2-3", "lat": 36.0, "lng": 140.0}]})
+        rows = GeocodedAddress.objects.filter(query="東京都見本町1-2-3")
+        self.assertEqual(rows.count(), 1)          # update_or_create — 중복 행 없음
+        self.assertEqual(rows.get().lat, 36.0)     # 최신이 이긴다
+
+    def test_invalid_body_400(self):
+        from .models import GeocodedAddress
+
+        res = self.client.post(self.URL, "깨진JSON{", content_type="application/json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(GeocodedAddress.objects.count(), 0)
+
+    def test_bad_items_filtered_out(self):
+        from .models import GeocodedAddress
+
+        # 범위 밖 좌표, 빈 주소, 필드 누락 — 전부 건너뛴다.
+        res = self._post({"items": [
+            {"query": "q", "lat": 91.0, "lng": 139.7},
+            {"query": "", "lat": 35.7, "lng": 139.7},
+            {"lat": 35.7, "lng": 139.7},
+        ]})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"ok": True, "saved": 0})
+        self.assertEqual(GeocodedAddress.objects.count(), 0)
+
+    def test_request_internal_duplicates_collapse(self):
+        from .models import GeocodedAddress
+
+        res = self._post({"items": [
+            {"query": "東京都大久保1-1", "lat": 35.71, "lng": 139.69},
+            {"query": "東京都大久保1-1", "lat": 35.72, "lng": 139.68},  # 마지막 값이 저장
+        ]})
+        self.assertEqual(res.json(), {"ok": True, "saved": 1})
+        self.assertEqual(GeocodedAddress.objects.get(query="東京都大久保1-1").lat, 35.72)
+
+    def test_requires_post(self):
+        res = self.client.get(self.URL)
+        self.assertEqual(res.status_code, 405)
+
+    def test_no_sheets_api_involved(self):
+        # DB 전환의 핵심 효과 — 저장 경로는 시트 API 를 아예 부르지 않는다.
+        with mock.patch.object(sheets, "get_service") as svc:
+            self._post({"items": [{"query": "q", "lat": 35.7, "lng": 139.7}]})
+        svc.assert_not_called()
+
+
+class MapDbCoordsTests(TestCase):
+    """지도 화면 — DB 좌표캐시 적중분은 점에 실리고, 미스는 null(클라 지오코딩)."""
+
+    def setUp(self):
+        self.member = get_user_model().objects.create_user(
+            username="tester", password="pw", name="홍길동", gender="d"
+        )
+        self.client.force_login(self.member)
+
+        patches = {
+            "get_card": lambda spreadsheet_id: dict(ViewOnlyModeTests.CARD),
+            "resolve_tab_title": lambda spreadsheet_id, gid: "1",
+            # ROW 의 address='見本町1-2-3' → 쿼리 '東京都見本町1-2-3'
+            "read_tab_rows": lambda spreadsheet_id, tab_title: {
+                "assignee": "", "end_row": 10, "rows": [dict(ViewOnlyModeTests.ROW)],
+            },
+        }
+        for name, fn in patches.items():
+            p = mock.patch.object(sheets, name, side_effect=fn)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def _get_map(self):
+        with self.settings(GOOGLE_MAPS_API_KEY="TESTKEY"):
+            return self.client.get("/cards/SID/1/map/")
+
+    def test_db_hit_included(self):
+        from .models import GeocodedAddress
+
+        GeocodedAddress.objects.create(query="東京都見本町1-2-3", lat=35.7, lng=139.7)
+        res = self._get_map()
+        self.assertContains(res, '"coords": {"lat": 35.7, "lng": 139.7}')
+        self.assertContains(res, "/cards/SID/map/coords/")  # 저장 엔드포인트
+
+    def test_db_miss_is_null(self):
+        from .models import GeocodedAddress
+
+        # 다른 주소만 있음(주소 수정 직후와 동일) → null — 클라가 지오코딩 후 저장.
+        GeocodedAddress.objects.create(query="東京都見本町9-9-9", lat=35.7, lng=139.7)
+        res = self._get_map()
+        self.assertContains(res, '"coords": null')
+
+
+class CardOverviewTests(SimpleTestCase):
+    """read_card_overview — 탭 메타(1h)+요약(60s) 조합: 통상 콜드=batchGet 1왕복."""
+
+    TABS_RESP = {"sheets": [
+        {"properties": {"sheetId": 999, "title": "삭제금지", "index": 0}},
+        {"properties": {"sheetId": 100, "title": "1A", "index": 1}},
+    ]}
+    SUMMARY_RESP = {"valueRanges": [
+        {"values": [["임명받은 전도인 : 홍길동"]]},                              # J2
+        {"values": [["見本町", "1", "2", "3", "", "", "", "", "",
+                     "만남 26/08/01 오후02"]]},                                  # 본문(3행~)
+    ]}
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.service = mock.Mock()
+        p = mock.patch.object(sheets, "get_service", return_value=self.service)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def _read(self, ex_side_effects):
+        with mock.patch.object(sheets, "execute", side_effect=ex_side_effects) as ex:
+            result = sheets.read_card_overview("SID")
+        return result, ex
+
+    def test_cold_is_two_calls_then_cached(self):
+        import datetime
+
+        (tabs, summary), ex = self._read([self.TABS_RESP, self.SUMMARY_RESP])
+        self.assertEqual(ex.call_count, 2)  # 재시작 직후 완전 콜드만 2왕복
+        self.assertEqual(tabs, [{"title": "1A", "gid": 100}])  # 특수 탭 제외
+        self.assertEqual(summary["1A"]["assignee"], "임명받은 전도인 : 홍길동")
+        self.assertEqual(summary["1A"]["count"], 1)
+        self.assertEqual(summary["1A"]["latest_date"], datetime.date(2026, 8, 1))
+
+        with mock.patch.object(sheets, "execute") as ex2:
+            sheets.read_card_overview("SID")  # 둘 다 캐시 적중
+        ex2.assert_not_called()
+
+    def test_summary_expiry_costs_single_batchget(self):
+        # 통상의 콜드 로드(요약 60초 만료, 탭 메타 1시간 생존) = batchGet 1왕복.
+        self._read([self.TABS_RESP, self.SUMMARY_RESP])
+        sheets._invalidate_body_cache("SID", "1A")  # 쓰기/만료로 요약만 소실
+        _, ex = self._read([self.SUMMARY_RESP])
+        self.assertEqual(ex.call_count, 1)
+        # 그 1왕복은 values.batchGet — 무거운 includeGridData 아님(폐기된 설계).
+        self.assertTrue(self.service.spreadsheets().values().batchGet.called)
+
+    def test_renamed_tab_invalidates_tabs_cache(self):
+        # 탭 개명 → 캐시된 옛 이름의 range 요청 실패 → 탭 메타 캐시 삭제(자가 치유).
+        self._read([self.TABS_RESP, self.SUMMARY_RESP])
+        sheets._invalidate_body_cache("SID", "1A")
+
+        missing = sheets.SheetsApiError("일시 오류")
+        missing.__cause__ = Exception("Unable to parse range: '1A'!J2")
+        with mock.patch.object(sheets, "execute", side_effect=[missing]):
+            with self.assertRaises(sheets.SheetsApiError):
+                sheets.read_card_overview("SID")
+        # 다음 시도는 탭 메타부터 다시(2왕복) — 새 이름으로 회복.
+        _, ex = self._read([self.TABS_RESP, self.SUMMARY_RESP])
+        self.assertEqual(ex.call_count, 2)
+
+    def test_is_card_overview_cached(self):
+        # 스피너 힌트용 캐시 상태 조회 — API 호출 없이 판정.
+        self.assertFalse(sheets.is_card_overview_cached("SID"))
+        self._read([self.TABS_RESP, self.SUMMARY_RESP])
+        self.assertFalse(sheets.is_card_overview_cached("OTHER"))
+        with mock.patch.object(sheets, "execute") as ex:
+            self.assertTrue(sheets.is_card_overview_cached("SID"))
+        ex.assert_not_called()
+
+
+class CardListWarmHintTests(TestCase):
+    """card_list — 캐시가 따뜻한 카드 링크에만 data-warm(스피너 생략 힌트)."""
+
+    def setUp(self):
+        self.member = get_user_model().objects.create_user(
+            username="tester", password="pw", name="홍길동", gender="d"
+        )
+        self.client.force_login(self.member)
+
+        cards = [
+            {"name": "따뜻카드 (3cards)", "url": "u", "count": 3,
+             "spreadsheet_id": "WARM", "gid": 0},
+            {"name": "차가운카드 (2cards)", "url": "u", "count": 2,
+             "spreadsheet_id": "COLD", "gid": 0},
+        ]
+        patches = {
+            "read_master_index": lambda: [dict(c) for c in cards],
+            "is_card_overview_cached": lambda sid: sid == "WARM",
+        }
+        for name, fn in patches.items():
+            p = mock.patch.object(sheets, name, side_effect=fn)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_warm_link_has_hint_and_cold_does_not(self):
+        res = self.client.get("/cards/")
+        html = res.content.decode()
+        # 따뜻한 카드 링크에만 data-warm — 차가운 카드는 클릭 즉시 스피너 대상.
+        def a_tag(marker):
+            pos = html.find(marker)
+            self.assertGreater(pos, 0, marker)
+            return html[html.rfind("<a", 0, pos):html.find(">", pos) + 1]
+
+        self.assertIn("data-warm", a_tag("/cards/WARM/"))
+        self.assertNotIn("data-warm", a_tag("/cards/COLD/"))
+
+
+class RowsFromValuesTests(SimpleTestCase):
+    """rows_from_values — values batchGet 원시 행 → 표시용 행 dict(순수 로직)."""
+
+    def test_parses_with_filldown_and_end_label(self):
+        values = [
+            ["見本町", "1", "2", "3", "빌라", "메모", "090"],      # 3행
+            ["", "4", "5", "6"],                                   # 4행 — A열 fill-down
+            [],                                                    # 5행 — 완전 빈 행 스킵
+            ["참고", "여기부터는 데이터 아님"],                      # 6행 — 끝 라벨
+            ["大久保", "9", "9", "9"],                              # 라벨 뒤 — 무시
+        ]
+        rows = mapping.rows_from_values(values)
+        self.assertEqual([r["row"] for r in rows], [3, 4])
+        self.assertEqual(rows[0]["address"], "見本町1-2-3")
+        self.assertEqual(rows[1]["address"], "見本町4-5-6")  # region 이어받음
+        self.assertEqual(rows[0]["bldg"], "빌라")
+
+    def test_latest_visit_parsed(self):
+        values = [
+            ["見本町", "1", "", "", "", "", "", "", "", "만남 26/08/01 오후02"],
+        ]
+        rows = mapping.rows_from_values(values)
+        self.assertEqual(rows[0]["latest"]["status"], "만남")
+        self.assertEqual(rows[0]["latest"]["date"], "26/08/01")
+
+    def test_empty_input(self):
+        self.assertEqual(mapping.rows_from_values([]), [])
+        self.assertEqual(mapping.rows_from_values(None), [])
+
+
+class ReadCardRowsTests(SimpleTestCase):
+    """read_card_rows — 전 탭 본문을 batchGet 1회로, 캐시+쓰기 무효화."""
+
+    TABS = [{"title": "1A", "gid": 0}, {"title": "2B", "gid": 111}]
+    RESP = {"valueRanges": [
+        {"values": [["見本町", "1", "2", "3"]]},
+        {"values": [["大久保", "7", "8", "9"]]},
+    ]}
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.service = mock.Mock()
+        p = mock.patch.object(sheets, "get_service", return_value=self.service)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_single_batchget_for_all_tabs(self):
+        with mock.patch.object(sheets, "execute", return_value=self.RESP) as ex:
+            result = sheets.read_card_rows("SID", self.TABS)
+        self.assertEqual(ex.call_count, 1)  # 탭별 개별 호출 금지
+        self.assertEqual(result["1A"][0]["address"], "見本町1-2-3")
+        self.assertEqual(result["2B"][0]["address"], "大久保7-8-9")
+        _, kwargs = self.service.spreadsheets().values().batchGet.call_args
+        self.assertEqual(kwargs["ranges"], ["'1A'!A3:O", "'2B'!A3:O"])
+
+    def test_cached_within_ttl(self):
+        with mock.patch.object(sheets, "execute", return_value=self.RESP) as ex:
+            first = sheets.read_card_rows("SID", self.TABS)
+            second = sheets.read_card_rows("SID", self.TABS)
+        self.assertEqual(ex.call_count, 1)
+        self.assertEqual(first, second)
+
+    def test_write_invalidates(self):
+        # 방문기록 등 쓰기 성공(_invalidate_body_cache) 후에는 재읽기.
+        with mock.patch.object(sheets, "execute", return_value=self.RESP) as ex:
+            sheets.read_card_rows("SID", self.TABS)
+            sheets._invalidate_body_cache("SID", "1A")
+            sheets.read_card_rows("SID", self.TABS)
+        self.assertEqual(ex.call_count, 2)
+
+    def test_empty_tabs(self):
+        with mock.patch.object(sheets, "execute") as ex:
+            self.assertEqual(sheets.read_card_rows("SID", []), {})
+        ex.assert_not_called()
+
+
+class CardMapViewTests(TestCase):
+    """시트(카드) 전체 지도 — staff 전용, 핀 라벨=탭 이름, 상세보기 없음, 좌표캐시 공유."""
+
+    TABS = [{"title": "1A", "gid": 0}, {"title": "2B", "gid": 111}]
+
+    def setUp(self):
+        # 카드 전체 지도는 staff/superuser 전용 — 기본 사용자를 staff 로.
+        self.member = get_user_model().objects.create_user(
+            username="tester", password="pw", name="홍길동", gender="d", is_staff=True
+        )
+        self.client.force_login(self.member)
+
+        def _row(row, region, banchi):
+            return {
+                "row": row, "region": region, "banchi": banchi,
+                "address": f"{region}{banchi}", "bldg": "", "phone": "",
+                "visits": [""] * 6, "latest": None,
+            }
+
+        patches = {
+            "get_card": lambda spreadsheet_id: dict(ViewOnlyModeTests.CARD),
+            "list_data_tabs": lambda spreadsheet_id: [dict(t) for t in self.TABS],
+            "read_card_rows": lambda spreadsheet_id, tabs: {
+                "1A": [_row(3, "見本町", "1-2-3")],
+                "2B": [_row(5, "大久保", "7-8-9")],
+            },
+            "read_card_overview": lambda spreadsheet_id: (
+                [dict(t) for t in self.TABS], {},
+            ),
+        }
+        for name, fn in patches.items():
+            p = mock.patch.object(sheets, name, side_effect=fn)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def _get_map(self):
+        with self.settings(GOOGLE_MAPS_API_KEY="TESTKEY"):
+            return self.client.get("/cards/SID/map/")
+
+    def test_points_from_all_tabs_with_tab_names(self):
+        res = self._get_map()
+        self.assertContains(res, '"tab": "1A"')
+        self.assertContains(res, '"tab": "2B"')
+        # 지오코딩 쿼리(東京都 접두) — 두 탭 주소 모두. json_script 는 비ASCII 를 \uXXXX 로 이스케이프.
+        self.assertContains(res, r"\u6771\u4eac\u90fd\u898b\u672c\u753a1-2-3")  # 東京都見本町1-2-3
+        self.assertContains(res, r"\u6771\u4eac\u90fd\u5927\u4e45\u4fdd7-8-9")  # 東京都大久保7-8-9
+        self.assertContains(res, "전체 구역")               # 부제
+        self.assertContains(res, "/cards/SID/")            # 뒤로가기(구역 선택)
+        self.assertContains(res, "/cards/SID/map/coords/")  # 좌표 저장(카드 공용)
+
+    def test_no_detail_links(self):
+        # 카드 지도는 개요 용도 — 점 JSON 에 상세 URL 을 싣지 않는다.
+        # (공용 JS 가 point.detail_url 을 '참조'하는 것은 무해 — JSON 키 부재로 판단)
+        res = self._get_map()
+        self.assertNotContains(res, '"detail_url"')
+        self.assertNotContains(res, "/row/")
+
+    def test_coords_cache_shared_with_tab_map(self):
+        # 탭 지도가 채운 DB 좌표캐시(주소 키 전역)를 그대로 재사용.
+        from .models import GeocodedAddress
+
+        GeocodedAddress.objects.create(query="東京都見本町1-2-3", lat=35.7, lng=139.7)
+        res = self._get_map()
+        self.assertContains(res, '"coords": {"lat": 35.7, "lng": 139.7}')
+        self.assertContains(res, '"coords": null')  # 나머지는 클라 지오코딩
+
+    def test_pin_color_is_tab_level_recency(self):
+        # 핀 색은 주소별이 아니라 '탭 단위' 최근성 — 탭 목록 타일 색과 일치해야 한다.
+        # 1A: 한 집만 오늘 방문 → 방문 안 한 집 포함 전 핀이 recent.
+        # 2B: 방문기록 없음 → old.
+        from django.utils import timezone as tz
+        today_cell = "만남 " + tz.localdate().strftime("%y/%m/%d") + " 오후01"
+
+        def _row(row, region, banchi, visits):
+            return {
+                "row": row, "region": region, "banchi": banchi,
+                "address": f"{region}{banchi}", "bldg": "", "phone": "",
+                "visits": visits + [""] * (6 - len(visits)),
+                "latest": mapping.latest_visit(visits),
+            }
+
+        sheets.read_card_rows.side_effect = lambda sid, tabs: {
+            "1A": [
+                _row(3, "見本町", "1-2-3", [today_cell]),
+                _row(4, "見本町", "4-5-6", []),          # 방문 없음 — 그래도 recent
+            ],
+            "2B": [_row(5, "大久保", "7-8-9", [])],
+        }
+        res = self._get_map()
+        self.assertContains(res, '"recency": "recent"', count=2)  # 1A 의 두 점
+        self.assertContains(res, '"recency": "old"', count=1)     # 2B
+
+    def test_unknown_card_404(self):
+        sheets.get_card.side_effect = lambda sid: None
+        res = self._get_map()
+        self.assertEqual(res.status_code, 404)
+
+    def test_no_template_comment_leak(self):
+        # Django {# #} 주석은 한 줄 전용 — 여러 줄이면 본문에 노출(실제 사고 3건째 방지).
+        for res in (self._get_map(), self.client.get("/cards/SID/")):
+            self.assertNotContains(res, "{#")
+
+    def test_tab_list_has_card_map_button(self):
+        res = self.client.get("/cards/SID/")
+        self.assertContains(res, "/cards/SID/map/")
+        self.assertContains(res, "전체 지도")
+
+    # ── staff/superuser 전용 (버튼 표시·서버 검사 동일 조건) ──
+    def _login_regular_user(self):
+        regular = get_user_model().objects.create_user(
+            username="regular", password="pw", name="일반성원", gender="d"
+        )
+        self.client.force_login(regular)
+
+    def test_non_staff_gets_403(self):
+        self._login_regular_user()
+        res = self._get_map()
+        self.assertEqual(res.status_code, 403)
+        self.assertContains(res, "관리자용 화면", status_code=403)
+
+    def test_non_staff_has_no_button(self):
+        self._login_regular_user()
+        res = self.client.get("/cards/SID/")
+        self.assertNotContains(res, "전체 지도")
+        self.assertNotContains(res, 'href="/cards/SID/map/"')
+
+    def test_superuser_allowed(self):
+        boss = get_user_model().objects.create_superuser(
+            username="boss", password="pw", name="관리자", gender="d"
+        )
+        self.client.force_login(boss)
+        res = self._get_map()
+        self.assertEqual(res.status_code, 200)

@@ -7,12 +7,17 @@
 <div class="max-w-lg mx-auto">
   <div class="mb-4">
     <div class="flex flex-wrap items-center gap-2">
-      <a href="{% url 'territory_cards:tab_list' card.spreadsheet_id %}"
+      <a href="{% url 'territory_cards:tab_list' card.spreadsheet_id %}" data-warm="1"
          class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg shadow-md hover:bg-indigo-700 active:scale-95 transition">
         <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
         </svg>
         구역 선택으로
+      </a>
+
+      <a href="{% url 'territory_cards:address_map' card.spreadsheet_id gid %}{% if view_only %}?view=1{% endif %}"
+         class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg shadow-md hover:bg-blue-700 active:scale-95 transition">
+        🗺 전체 지도
       </a>
 
       {# 반납은 '시작'으로 자기 이름을 기록한 본인에게만 (열람 모드에서도 숨김) #}
@@ -40,11 +45,12 @@
     {% for row in rows %}
     <li>
       {# 오늘 방문한 곳(상태 무관)은 엷은 회색으로 — 이미 다녀왔음을 한눈에. #}
-      <a href="{% url 'territory_cards:row_detail' card.spreadsheet_id gid row.row %}{% if view_only %}?view=1{% endif %}"
+      <a href="{% url 'territory_cards:row_detail' card.spreadsheet_id gid row.row %}{% if view_only %}?view=1{% endif %}" data-warm="1"
          class="block {% if row.visited_today %}bg-gray-200{% else %}bg-white{% endif %} rounded-xl shadow p-4 active:bg-gray-50 transition">
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <p class="font-semibold text-blue-800">{{ row.banchi }}{% if row.bldg %} <span class="text-gray-700 font-normal">{{ row.bldg }}</span>{% endif %}</p>
+            {# 시트 행번호 배지 — 시트를 직접 보는 사람들과 같은 번호로 대화할 수 있게 #}
+            <p class="font-semibold text-blue-800"><span class="inline-block align-middle mr-1.5 px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] font-mono font-medium text-gray-500">{{ row.row }}행</span>{{ row.banchi }}{% if row.bldg %} <span class="text-gray-700 font-normal">{{ row.bldg }}</span>{% endif %}</p>
             {% if row.latest %}
             <p class="mt-1 text-xs text-gray-500">🕒 {{ row.latest.date }} {{ row.latest.time }}</p>
             {% else %}

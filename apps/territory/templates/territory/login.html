@@ -15,8 +15,8 @@
 
   <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
     {% for member in members %}
-        {% if onboarding and member.line_profile %}
-        {# 이미 LINE 계정이 연결된 멤버 — 온보딩에서는 선택 불가 #}
+        {% if onboarding and member.already_linked %}
+        {# 이 프로바이더에 이미 연결된 멤버 — 온보딩에서는 선택 불가 #}
         <div class="bg-gray-100 rounded-xl shadow-inner p-3 flex items-center justify-center min-h-[56px] opacity-60">
             <span class="text-base font-bold text-gray-500 break-keep">🔗 {{ member.name }}</span>
         </div>

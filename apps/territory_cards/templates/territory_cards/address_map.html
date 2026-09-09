@@ -1,0 +1,362 @@
+{% extends "base_with_tailwind.html" %}
+{% block title %}구역 지도{% endblock %}
+{% block header %}🗺 구역 지도{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+  <div class="mb-3">
+    <div class="flex flex-wrap items-center gap-2">
+      {# 뒤로가기 목적지는 뷰가 주입 — 탭 지도(주소 목록으로) / 카드 지도(구역 선택으로) #}
+      <a href="{{ back_url }}" data-warm="1"
+         class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg shadow-md hover:bg-indigo-700 active:scale-95 transition">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
+        </svg>
+        {{ back_label }}
+      </a>
+    </div>
+    <h2 class="text-lg font-bold text-gray-800 mt-3 truncate">{{ card.name }} · {{ map_scope }}</h2>
+  </div>
+
+  {% if not maps_api_key %}
+  <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+    지도 기능이 아직 설정되지 않았습니다. 관리자에게 문의하세요.
+    <span class="block mt-1 text-xs text-amber-600">(.env 의 GOOGLE_MAPS_API_KEY 미설정)</span>
+  </div>
+  {% elif not points %}
+  <p class="text-center text-gray-500 py-10">표시할 주소가 없습니다.</p>
+  {% else %}
+
+  {# 한도/오류 알림 — 일일 쿼터 도달 등 지도가 정상 동작하지 못할 때 표시 #}
+  <div id="map-alert" class="hidden mb-2 bg-amber-50 border border-amber-300 rounded-xl p-3 text-sm text-amber-800 font-medium"></div>
+
+  {# 진행 표시 + 범례 — 지오코딩은 브라우저에서 순차 진행된다 #}
+  <div class="flex items-center justify-between mb-2 text-xs text-gray-600">
+    <div id="map-progress">지도 준비 중…</div>
+    <div class="flex items-center gap-2">
+      <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#10b981"></span>2개월 이내</span>
+      <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#f97316"></span>3개월 이내</span>
+      <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#ef4444"></span>그 이전</span>
+    </div>
+  </div>
+
+  <div class="relative">
+    <div id="map" class="w-full rounded-xl shadow bg-gray-100" style="height: 70vh;"></div>
+    {# 내 위치 — 누르면 위치 권한을 요청하고 파란 점으로 표시 + 그 위치로 이동 #}
+    <button type="button" id="locate-btn" onclick="locateMe()"
+            class="absolute bottom-4 left-3 px-3 py-2 rounded-full bg-white shadow-md text-sm font-bold text-gray-700 active:scale-95 transition">
+      📍 내 위치
+    </button>
+  </div>
+
+  {# 지오코딩 실패한 주소 목록(있을 때만 표시) #}
+  <div id="map-failed" class="hidden mt-2 bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700"></div>
+
+  {{ points|json_script:"map-points" }}
+  <script>
+    const POINTS = JSON.parse(document.getElementById("map-points").textContent);
+    const PIN_COLORS = { recent: "#10b981", stale: "#f97316", old: "#ef4444" };
+    // 좌표 3단 캐시: ① DB 좌표캐시(point.coords — 서버가 렌더 시 공급, 전원 공유)
+    //               ② localStorage(기기별 보조) ③ 지오코딩(그 외).
+    // ②③ 으로 얻은 좌표는 서버에 저장해(saveCoords → DB) ① 로 수렴시킨다 — 셀프힐링.
+    const GEO_CACHE_PREFIX = "tskgeo:v1:";
+    const SAVE_COORDS_URL = "{% url 'territory_cards:save_coords' card.spreadsheet_id %}";
+
+    function cacheGet(query) {
+      try {
+        const raw = localStorage.getItem(GEO_CACHE_PREFIX + query);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) { return null; }
+    }
+    function cachePut(query, latlng) {
+      try { localStorage.setItem(GEO_CACHE_PREFIX + query, JSON.stringify(latlng)); } catch (e) {}
+    }
+
+    function getCookie(name) {
+      const m = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
+      return m ? decodeURIComponent(m[2]) : "";
+    }
+
+    // ── 시트 되쓰기 큐 — 지오코딩/로컬캐시로 얻은 좌표를 배치로 저장 ──
+    // 10건 모이면 중간 저장(도중 이탈 대비), 큐 종료/한도 중단 시 잔여분 저장.
+    // 실패는 조용히 넘긴다 — localStorage 에는 남아 있으므로 다음 열람 때 재시도된다.
+    let pendingSaves = [];
+
+    function queueCoordsSave(point, latlng) {
+      pendingSaves.push({ query: point.query, lat: latlng.lat, lng: latlng.lng });
+      if (pendingSaves.length >= 10) flushCoordsSaves();
+    }
+
+    function flushCoordsSaves() {
+      if (!pendingSaves.length) return;
+      const items = pendingSaves;
+      pendingSaves = [];
+      fetch(SAVE_COORDS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie("csrftoken") },
+        body: JSON.stringify({ items }),
+      }).catch(() => {});
+    }
+
+    let map, geocoder, infoWindow, bounds;
+
+    function showMapAlert(message) {
+      const box = document.getElementById("map-alert");
+      box.textContent = message;
+      box.classList.remove("hidden");
+    }
+
+    // 구글맵이 키/쿼터 문제로 지도를 못 띄울 때 부르는 공식 콜백.
+    // (일일 지도 로드 한도 초과, 리퍼러 불일치, 키 무효 등이 모두 여기로 온다)
+    window.gm_authFailure = function () {
+      showMapAlert("⚠️ 오늘의 지도 사용량 한도에 도달했거나 지도 설정에 문제가 있어 "
+                   + "지도를 표시할 수 없습니다. 내일 다시 시도해 주세요. "
+                   + "(계속되면 관리자에게 문의)");
+      document.getElementById("map-progress").textContent = "";
+    };
+
+    function initMap() {
+      bounds = new google.maps.LatLngBounds();
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 35.6895, lng: 139.6917 },  // 도쿄 — 첫 마커가 잡히면 fitBounds 로 대체
+        zoom: 12,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+        gestureHandling: "greedy",
+      });
+      geocoder = new google.maps.Geocoder();
+      infoWindow = new google.maps.InfoWindow();
+      processQueue();
+    }
+
+    let done = 0;
+    const failed = [];
+
+    function updateProgress() {
+      const el = document.getElementById("map-progress");
+      if (done < POINTS.length) {
+        el.textContent = `주소 위치 확인 중… ${done}/${POINTS.length}`;
+      } else {
+        el.textContent = failed.length
+          ? `${POINTS.length - failed.length}곳 표시 (${failed.length}곳 위치 확인 실패)`
+          : `${POINTS.length}곳 표시`;
+        if (failed.length) {
+          const box = document.getElementById("map-failed");
+          box.textContent = "위치를 찾지 못한 주소: " + failed.join(", ");
+          box.classList.remove("hidden");
+        }
+      }
+    }
+
+    // ── 같은 좌표(같은 건물의 여러 세대)는 그룹 핀 하나로 묶는다 ──
+    // 완전히 같은 좌표는 확대해도 안 갈라지므로, 겹침은 흩뿌리기가 아니라
+    // 그룹핀("N건") + 정보창의 행별 목록으로 푼다.
+    const groups = {};  // "lat,lng"(소수 6자리) → {marker, points[]}
+    const RECENCY_RANK = { recent: 0, stale: 1, old: 2 };  // 클수록 "오래 안 감"
+
+    function addMarker(point, latlng) {
+      const key = latlng.lat.toFixed(6) + "," + latlng.lng.toFixed(6);
+      let group = groups[key];
+      if (!group) {
+        group = groups[key] = {
+          points: [],
+          marker: new google.maps.Marker({ map: map, position: latlng }),
+        };
+        group.marker.addListener("click", () => openGroupInfo(group, latlng));
+        bounds.extend(latlng);
+        map.fitBounds(bounds);
+        // fitBounds 반영은 비동기 — 마커 1개일 때 과도 줌만 idle 시점에 완화.
+        google.maps.event.addListenerOnce(map, "idle", () => {
+          if (map.getZoom() > 17) map.setZoom(17);
+        });
+      }
+      group.points.push(point);
+      refreshGroupMarker(group);
+    }
+
+    function groupRecency(group) {
+      // 그룹 색은 구성원 중 가장 "오래 안 간" 상태 — 방문할 곳 찾기 목적.
+      return group.points.reduce(
+        (worst, p) => (RECENCY_RANK[p.recency] > RECENCY_RANK[worst] ? p.recency : worst),
+        "recent",
+      );
+    }
+
+    function groupLabel(group, tabs) {
+      // 카드 지도(point.tab 있음): 목적이 "어느 탭이 어느 지역을 커버하나"이므로
+      // 그룹이어도 건수가 아니라 '탭 이름'을 보여준다.
+      //   단독 1건 → 탭 이름 그대로('1A'),
+      //   같은 탭만 겹침(같은 건물 여러 세대 — 대부분) → '+' 첨자('1A+')로 중복임을 표시,
+      //   여러 탭이 같은 좌표(구역 경계의 드문 경우) → '1A+2B', 3개 이상 '1A+2'.
+      // 탭 지도: 단독=행번호 / 그룹=겹친 건수("N건") — 종전 그대로.
+      const single = group.points.length === 1;
+      if (tabs.length === 1) return single ? tabs[0] : `${tabs[0]}+`;
+      if (tabs.length === 2) return tabs.join("+");
+      if (tabs.length > 2) return `${tabs[0]}+${tabs.length - 1}`;
+      return single ? String(group.points[0].row) : `${group.points.length}건`;
+    }
+
+    function refreshGroupMarker(group) {
+      const single = group.points.length === 1;
+      const rows = group.points.map((p) => p.row).sort((a, b) => a - b);
+      const tabs = [...new Set(group.points.map((p) => p.tab).filter(Boolean))].sort();
+      const label = groupLabel(group, tabs);
+      group.marker.setLabel({
+        text: label,
+        color: "#ffffff",
+        // 긴 라벨('1A+2B' 등)은 핀 원 안에 맞게 글자를 줄인다.
+        fontSize: label.length >= 5 ? "9px" : (single ? "11px" : "10px"),
+        fontWeight: "700",
+      });
+      group.marker.setIcon({
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: single ? 12 : 15,
+        fillColor: PIN_COLORS[groupRecency(group)] || "#6b7280",
+        fillOpacity: 0.95,
+        strokeColor: "#ffffff",
+        strokeWeight: single ? 2 : 3,
+      });
+      group.marker.setTitle(tabs.length ? tabs.join(",") : `(${rows.join(",")}행)`);
+    }
+
+    function pointLine(point) {
+      const visit = point.status
+        ? `<span style="color:#6b7280">${point.status} · ${point.date}</span>`
+        : `<span style="color:#9ca3af">기록 없음</span>`;
+      // 카드 지도: 머리는 탭 이름, 상세보기 없음(개요 용도). 탭 지도: 행번호 + 상세보기.
+      const head = point.tab ? `(${point.tab})` : `(${point.row}행)`;
+      const detail = point.detail_url
+        ? ` · <a href="${point.detail_url}" style="color:#4f46e5; font-weight:600">상세보기</a>`
+        : "";
+      return `<div style="padding:3px 0; border-bottom:1px solid #f3f4f6">
+                <span style="font-weight:700">${head}</span> ${point.label}<br>
+                ${visit}${detail}
+              </div>`;
+    }
+
+    function openGroupInfo(group, latlng) {
+      // 카드 지도는 탭 이름 → 행번호 순, 탭 지도는 행번호 순.
+      const rows = [...group.points].sort(
+        (a, b) => (a.tab || "").localeCompare(b.tab || "") || a.row - b.row
+      );
+      const gmaps = `https://www.google.com/maps/search/?api=1&query=${latlng.lat},${latlng.lng}`;
+      infoWindow.setContent(
+        `<div style="min-width:170px; max-height:220px; overflow-y:auto">
+           ${rows.map(pointLine).join("")}
+           <div style="margin-top:6px">
+             <a href="${gmaps}" target="_blank" rel="noopener" style="color:#2563eb">구글맵 앱으로 열기</a>
+           </div>
+         </div>`
+      );
+      infoWindow.open(map, group.marker);
+    }
+
+    // ── 내 위치 (버튼 클릭 시에만 권한 요청 — 파란 점 + 이동) ──
+    let myLocationMarker = null;
+
+    function locateMe() {
+      const btn = document.getElementById("locate-btn");
+      if (!navigator.geolocation) {
+        btn.textContent = "위치 사용 불가";
+        return;
+      }
+      btn.textContent = "📍 확인 중…";
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          if (!myLocationMarker) {
+            myLocationMarker = new google.maps.Marker({
+              map: map,
+              position: latlng,
+              title: "내 위치",
+              zIndex: 9999,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: "#4285F4",   // 구글맵 관례의 파란 점
+                fillOpacity: 1,
+                strokeColor: "#ffffff",
+                strokeWeight: 3,
+              },
+            });
+          } else {
+            myLocationMarker.setPosition(latlng);
+          }
+          map.panTo(latlng);
+          if (map.getZoom() < 15) map.setZoom(16);
+          btn.textContent = "📍 내 위치";
+        },
+        () => { btn.textContent = "📍 위치 권한 필요"; },
+        { enableHighAccuracy: true, timeout: 10000 },
+      );
+    }
+
+    // Geocoder 는 클라이언트측 쿼터(초당 제한)가 있어 순차 + 소폭 딜레이로 처리.
+    // OVER_QUERY_LIMIT 은 대기 후 재시도하되, 연속 3회면 "일일 한도 도달"로
+    // 판단해 알림을 띄우고 큐를 중단한다(캐시된 핀은 이미 표시된 상태).
+    const OVER_LIMIT_MAX_RETRIES = 3;
+
+    function stopForDailyLimit(index) {
+      showMapAlert("⚠️ 오늘의 주소 위치 확인(지오코딩) 한도에 도달했습니다. "
+                   + "일부 주소가 지도에 표시되지 않을 수 있어요. "
+                   + "내일 다시 열면 이어서 표시됩니다.");
+      document.getElementById("map-progress").textContent =
+        `${index}/${POINTS.length} 표시 (일일 한도 도달로 중단)`;
+      flushCoordsSaves();  // 한도로 중단해도 여기까지의 좌표는 시트에 남긴다
+    }
+
+    function processQueue(index = 0, delay = 150, retries = 0) {
+      if (index >= POINTS.length) { updateProgress(); flushCoordsSaves(); return; }
+      const point = POINTS[index];
+      // ① DB 좌표(전원 공유) — 지오코딩·저장 모두 불필요.
+      if (point.coords) {
+        addMarker(point, point.coords);
+        done += 1;
+        updateProgress();
+        processQueue(index + 1, delay);
+        return;
+      }
+      // ② localStorage(기기별) — 핀은 즉시, 좌표는 시트에 되써서 ① 로 승격.
+      const cached = cacheGet(point.query);
+      if (cached) {
+        addMarker(point, cached);
+        queueCoordsSave(point, cached);
+        done += 1;
+        updateProgress();
+        processQueue(index + 1, delay);  // 캐시 적중은 딜레이 없이
+        return;
+      }
+      // ③ 지오코딩 — 성공분은 localStorage + 시트 양쪽에 저장.
+      geocoder.geocode({ address: point.query, region: "jp" }, (results, status) => {
+        if (status === "OK" && results && results[0]) {
+          const loc = results[0].geometry.location;
+          const latlng = { lat: loc.lat(), lng: loc.lng() };
+          cachePut(point.query, latlng);
+          addMarker(point, latlng);
+          queueCoordsSave(point, latlng);
+        } else if (status === "OVER_QUERY_LIMIT") {
+          if (retries + 1 >= OVER_LIMIT_MAX_RETRIES) {
+            stopForDailyLimit(index);  // 백오프로도 안 풀림 = 일일 한도
+            return;
+          }
+          setTimeout(
+            () => processQueue(index, Math.min(delay * 2, 2000), retries + 1),
+            1200,
+          );
+          return;
+        } else {
+          failed.push(point.label);
+        }
+        done += 1;
+        updateProgress();
+        setTimeout(() => processQueue(index + 1, delay), delay);
+      });
+    }
+  </script>
+  <script async
+    src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key|urlencode }}&callback=initMap&loading=async&region=JP&language=ja">
+  </script>
+  {% endif %}
+</div>
+{% endblock %}

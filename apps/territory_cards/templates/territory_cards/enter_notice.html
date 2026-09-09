@@ -12,28 +12,35 @@
       <p><span class="text-gray-400">구역</span> {{ tab_title }}</p>
     </div>
     <p class="text-sm text-gray-700">
-      임명받은 전도인 이름(<span class="font-semibold text-blue-700">{{ my_name }}</span>)을
-      기록하고 봉사를 시작하거나, 이름을 기록하지 않고 열람만 할 수 있습니다.
+      임명받은 전도인 이름을 기록하고 봉사를 시작하거나, 이름을 기록하지 않고 열람만 할 수 있습니다.
     </p>
 
-    <div class="flex gap-3 pt-2">
-      <a href="{% url 'territory_cards:tab_list' card.spreadsheet_id %}"
-         class="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold active:bg-gray-200 transition">
-        취소
-      </a>
-      <form method="post" action="{% url 'territory_cards:enter_tab' card.spreadsheet_id gid %}" class="flex-1">
-        {% csrf_token %}
-        <input type="hidden" name="confirm" value="1">
+    <form method="post" action="{% url 'territory_cards:enter_tab' card.spreadsheet_id gid %}" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="confirm" value="1">
+      {# 기록할 이름 — 기본값은 J2 의 현재 이름(없으면 내 이름). 함께 봉사하면 덧붙여 수정 가능. #}
+      <div class="space-y-1.5 text-left">
+        <input type="text" name="assignee" value="{{ default_assignee }}"
+               autocomplete="off" autocapitalize="off" spellcheck="false"
+               class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base text-center text-gray-800">
+        <p class="text-xs text-gray-400">함께 봉사하는 전도인이 있으면 이름을 덧붙여 수정할 수 있습니다.</p>
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <a href="{% url 'territory_cards:tab_list' card.spreadsheet_id %}" data-warm="1"
+           class="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold active:bg-gray-200 transition">
+          취소
+        </a>
         <button type="submit"
-                class="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold active:bg-blue-700 transition">
+                class="flex-1 py-3 rounded-xl bg-blue-600 text-white font-semibold active:bg-blue-700 transition">
           시작
         </button>
-      </form>
-      <a href="{% url 'territory_cards:address_list' card.spreadsheet_id gid %}?view=1"
-         class="flex-1 py-3 rounded-xl bg-white border border-blue-300 text-blue-700 font-semibold active:bg-blue-50 transition">
-        열람
-      </a>
-    </div>
+        <a href="{% url 'territory_cards:address_list' card.spreadsheet_id gid %}?view=1"
+           class="flex-1 py-3 rounded-xl bg-white border border-blue-300 text-blue-700 font-semibold active:bg-blue-50 transition">
+          열람
+        </a>
+      </div>
+    </form>
   </div>
 </div>
 {% endblock %}

@@ -131,6 +131,6 @@ def settlement_row(name, count, month_days, unit, bonus):
     perfect = month_days > 0 and count >= month_days
     total = count * unit + (bonus if perfect else 0)
     return {
-        "name": name, "count": count, "unit": unit,
+        "name": name, "count": count, "month_days": month_days, "unit": unit,
         "bonus": bonus, "perfect": perfect, "total": total,
     }

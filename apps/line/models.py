@@ -1,73 +1,10 @@
-import secrets
-
 from django.conf import settings
 from django.db import models
 
-
-class LineProfile(models.Model):
-    """
-    LINE 계정과 기존 Member 를 잇는 연결 테이블.
-
-    FitLog 의 동일 패턴을 따른다. Member 모델 자체는 건드리지 않고,
-    LINE 사용자 ID(ID Token 의 sub)와 표시 이름/프로필 이미지만 분리 저장한다.
-    TSK 는 신규 자동가입이 아니라, 이미 구역이 배정된 기존 Member 에
-    셀프 온보딩(그룹→멤버 선택)으로 연결하는 점이 다르다.
-    """
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="line_profile",
-    )
-    line_user_id = models.CharField(max_length=64, unique=True)
-    display_name = models.CharField(max_length=100, blank=True)
-    picture_url = models.URLField(blank=True)
-    linked_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.user} ({self.display_name or self.line_user_id})"
-
-
-def _generate_code():
-    """6자리 숫자 코드. 폰에서 입력하기 쉽도록 숫자만 쓴다."""
-    return f"{secrets.randbelow(1_000_000):06d}"
-
-
-class LineLinkCode(models.Model):
-    """
-    멤버별 1회용 LINE 연결 초대코드.
-
-    온보딩에서 아무 이름이나 선택해 남의 멤버로 연결되는 것(악의/실수)을 막는
-    본인 확인 수단. 관리자가 발급해 각 성원에게 개별 전달(LINE 등)하고,
-    온보딩에서 이름 선택 + 코드 입력이 일치해야 연결된다. 연결 성공 시 사용 처리.
-    """
-    member = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="line_link_code",
-    )
-    code = models.CharField(max_length=6, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    used_at = models.DateTimeField(null=True, blank=True)
-
-    @classmethod
-    def issue_for(cls, member):
-        """
-        멤버에게 코드를 발급한다. 이미 있으면 새 값으로 교체하고 미사용으로 리셋
-        (재발급 = 기존 코드 무효화).
-        """
-        for _ in range(20):
-            code = _generate_code()
-            if not cls.objects.filter(code=code).exists():
-                break
-        obj, _created = cls.objects.update_or_create(
-            member=member,
-            defaults={"code": code, "used_at": None},
-        )
-        return obj
-
-    def __str__(self):
-        state = "사용됨" if self.used_at else "미사용"
-        return f"{self.member} 초대코드 ({state})"
+# LINE 계정 ↔ Member 연결(구 LineProfile/LineLinkCode)은 2단계 신원 추상화로
+# apps.messenger(MessengerAccount/LinkCode, provider='line')에 일반화 이사했다.
+# 아래 봇 모델들(BotKeyword/BotMenuItem/DailyText*)은 소유는 apps.bot 코어지만
+# 마이그레이션 비용 때문에 저장 위치만 여기 잔류한다(CLAUDE.md 참고).
 
 
 class BotKeyword(models.Model):
@@ -88,6 +25,7 @@ class BotKeyword(models.Model):
     ACTION_WEEKLY_READING = "weekly_reading"
     ACTION_DT_STAMP = "daily_text_stamp"
     ACTION_DT_REPORT = "daily_text_report"
+    ACTION_HELP = "help"
     ACTION_CHOICES = [
         (ACTION_MENU, "전체 메뉴"),
         (ACTION_BIBLE_READING, "성경통독"),
@@ -95,6 +33,7 @@ class BotKeyword(models.Model):
         (ACTION_WEEKLY_READING, "주간 성서 읽기"),
         (ACTION_DT_STAMP, "성구 스탬프 카드"),
         (ACTION_DT_REPORT, "성구 월말 정산"),
+        (ACTION_HELP, "도움말 (발신자 맞춤 키워드 안내, 1:1 전용)"),
     ]
 
     word = models.CharField("키워드", max_length=50, unique=True)

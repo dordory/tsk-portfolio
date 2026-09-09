@@ -22,6 +22,7 @@ Google Sheets 접근 계층 (서비스 계정, Sheets API v4).
 import json
 import logging
 import threading
+import time
 
 from django.conf import settings
 from django.core.cache import cache
@@ -52,6 +53,12 @@ logger = logging.getLogger(__name__)
 META_CACHE_TTL = 300  # 초
 BODY_CACHE_TTL = 60  # 초
 
+# 탭 메타(이름/gid/순서)만은 더 길게 — 탭 구조는 거의 안 바뀌고 URL 이 gid 기반이라
+# 낡아도 안전하다. 덕분에 tab_list 의 통상 콜드 로드가 batchGet 1왕복으로 끝난다.
+# 탭 개명 직후에는 옛 이름의 range 요청이 실패하는데, read_card_overview 가 이를
+# 감지해 이 캐시를 지우므로(자가 치유) 다음 시도에 회복된다.
+TABS_CACHE_TTL = 3600  # 초
+
 _CACHE_MISS = object()
 
 
@@ -72,11 +79,16 @@ def _summary_cache_key(spreadsheet_id):
     return f"tcards:summary:{spreadsheet_id}"
 
 
+def _card_rows_cache_key(spreadsheet_id):
+    return f"tcards:cardrows:{spreadsheet_id}"
+
+
 def _invalidate_body_cache(spreadsheet_id, tab_title):
-    """쓰기 성공 직후 호출 — 해당 탭 본문과 그 카드의 탭 요약 캐시를 지운다."""
+    """쓰기 성공 직후 호출 — 해당 탭 본문과 그 카드의 탭 요약/전체 지도 캐시를 지운다."""
     cache.delete_many([
         _rows_cache_key(spreadsheet_id, tab_title),
         _summary_cache_key(spreadsheet_id),
+        _card_rows_cache_key(spreadsheet_id),
     ])
 
 SCOPES = [
@@ -169,6 +181,23 @@ def _proxy_info():
 # 스레드별로 캐시한다(스레드 기반 WSGI 에서 커넥션 공유로 인한 간헐 오류 방지).
 _thread_cache = threading.local()
 
+# 자격증명(Credentials)은 반대로 '프로세스 전역'으로 1회만 만들어 공유한다.
+# OAuth 액세스 토큰이 자격증명 객체 안에 캐시되어 ~1시간 재사용되는데, 스레드마다
+# 새로 만들면 그 스레드의 첫 요청이 매번 토큰 발급 왕복(oauth2.googleapis.com)을
+# 치른다 — dev 서버(runserver)는 요청마다 새 스레드라 '모든 요청'이 이 세금을 냈다.
+# 자격증명 공유 + 스레드별 Http 조합은 google-auth 의 표준 사용 패턴.
+_creds_lock = threading.Lock()
+_shared_creds = None
+
+
+def _get_credentials():
+    """프로세스 공유 자격증명(1회 생성, 실패는 캐시하지 않음 — 설정 수정 후 재시도 가능)."""
+    global _shared_creds
+    with _creds_lock:
+        if _shared_creds is None:
+            _shared_creds = _load_credentials()
+        return _shared_creds
+
 
 def build_service(api, version):
     """
@@ -186,7 +215,7 @@ def build_service(api, version):
     from googleapiclient.discovery import build  # 지연 import
     from google_auth_httplib2 import AuthorizedHttp  # 지연 import
 
-    creds = _load_credentials()
+    creds = _get_credentials()  # 프로세스 공유 — 토큰 재사용(스레드마다 재발급 방지)
 
     # 프록시 필요 환경(PythonAnywhere 무료 등)이면 httplib2 에 프록시를 태운다.
     # httplib2 는 프록시를 자동 적용하지 않으므로 명시적으로 주입해야 한다.
@@ -235,7 +264,16 @@ def execute(request):
         HttpError = None
 
     try:
-        return request.execute(num_retries=2)
+        started = time.monotonic()
+        result = request.execute(num_retries=2)
+        # 호출별 소요시간 계측 — DEBUG 레벨(개발/테스트머신, 또는 LOG_LEVEL=DEBUG)에서만
+        # 출력된다. 화면이 느릴 때 어느 API 가 병목인지 바로 보인다.
+        logger.debug(
+            "Google API %s — %.0f ms",
+            getattr(request, "methodId", "?"),
+            (time.monotonic() - started) * 1000,
+        )
+        return result
     except tuple(network_errors) as e:
         logger.exception("Google API 네트워크 오류(재시도 소진)")
         raise SheetsApiError(_TRANSIENT_ERROR_MSG) from e
@@ -336,17 +374,21 @@ def get_card(spreadsheet_id):
 # ─────────────────────────────────────────────────────────────
 # 탭 메타 (제목 / gid)
 # ─────────────────────────────────────────────────────────────
-_SPECIAL_TABS = {mapping.STATUS_LIST_TAB, "반납할구역"}
+_SPECIAL_TABS = {mapping.STATUS_LIST_TAB, mapping.COORDS_CACHE_TAB, "반납할구역"}
 
 
 def list_tabs(spreadsheet_id):
     """
-    스프레드시트의 탭 메타 목록을 반환한다. META_CACHE_TTL 동안 캐시된다
-    (gid→제목 해석이 모든 탭 화면·쓰기에서 일어나므로).
+    스프레드시트의 탭 메타 목록을 반환한다. TABS_CACHE_TTL(1시간) 동안 캐시된다
+    (gid→제목 해석이 모든 탭 화면·쓰기에서 일어나고, 탭 구조는 거의 안 바뀜).
     반환: [{title, index, gid}, ...] (index 는 0-기반 시트 순서)
     특수 탭(삭제금지/반납할구역 등)도 포함되므로 필터는 호출측에서.
     """
-    return _cached(f"tcards:tabs:{spreadsheet_id}", lambda: _fetch_tabs(spreadsheet_id))
+    return _cached(
+        f"tcards:tabs:{spreadsheet_id}",
+        lambda: _fetch_tabs(spreadsheet_id),
+        ttl=TABS_CACHE_TTL,
+    )
 
 
 def _fetch_tabs(spreadsheet_id):
@@ -378,7 +420,9 @@ def list_data_tabs(spreadsheet_id):
 
 def read_tabs_summary(spreadsheet_id, tabs):
     """
-    탭 목록 화면용 요약을 batchGet '한 번'으로 읽는다(탭별 개별 호출 금지 — 느려짐).
+    탭별 요약을 batchGet '한 번'으로 읽는다(탭별 개별 호출 금지 — 느려짐).
+    (탭 목록 화면은 콜드 왕복을 줄인 read_card_overview 경유로 전환 — 같은 캐시 키를
+    같은 형식으로 공유하므로 어느 쪽이 채워도 서로 적중한다.)
     BODY_CACHE_TTL 동안 캐시되며, 이 카드에 대한 쓰기(방문기록/비고/배정) 성공 시
     무효화된다. 키는 카드(spreadsheet_id) 단위 — tabs 는 항상 list_data_tabs 결과
     전체가 온다는 전제.
@@ -427,6 +471,82 @@ def _fetch_tabs_summary(spreadsheet_id, tabs):
             "latest_date": mapping.latest_visit_date(rows_summary["visit_cells"]),
         }
     return summary
+
+
+def read_card_rows(spreadsheet_id, tabs):
+    """
+    시트(카드) 전체 지도용 — 모든 데이터 탭의 본문을 batchGet '한 번'으로 읽는다
+    (탭별 개별 호출 금지 — read_tabs_summary 와 같은 원칙). 하이퍼링크가 필요 없어
+    values 로 충분하다(파싱은 mapping.rows_from_values).
+
+    BODY_CACHE_TTL 동안 캐시되고, 이 카드에 대한 쓰기 성공 시 무효화된다.
+    tabs 는 항상 list_data_tabs 결과 전체가 온다는 전제(캐시 키가 카드 단위).
+
+    반환: {tab_title: [row dict, ...]} (row dict 는 rows_from_values 참고)
+    """
+    if not tabs:
+        return {}
+    return _cached(
+        _card_rows_cache_key(spreadsheet_id),
+        lambda: _fetch_card_rows(spreadsheet_id, tabs),
+        ttl=BODY_CACHE_TTL,
+    )
+
+
+def _fetch_card_rows(spreadsheet_id, tabs):
+    service = get_service()
+    data_range = f"{mapping.REGION_COL}{mapping.DATA_ROW_START}:{mapping.VISIT_COLS[-1]}"
+    ranges = [_a1(t["title"], data_range) for t in tabs]
+    resp = execute(
+        service.spreadsheets()
+        .values()
+        .batchGet(spreadsheetId=spreadsheet_id, ranges=ranges)
+    )
+    value_ranges = resp.get("valueRanges", [])
+    return {
+        t["title"]: mapping.rows_from_values(
+            value_ranges[i].get("values", []) if i < len(value_ranges) else []
+        )
+        for i, t in enumerate(tabs)
+    }
+
+
+def read_card_overview(spreadsheet_id):
+    """
+    탭 목록 화면용 — (list_data_tabs 결과, read_tabs_summary 결과)를 돌려준다.
+
+    콜드 로드 전략: 탭 메타는 TABS_CACHE_TTL(1시간)로 길게 캐시되므로, 통상의
+    콜드 로드(요약 60초 만료)는 **가벼운 values.batchGet 1왕복**으로 끝난다.
+    서버 재시작 직후에만 메타+요약 2왕복.
+
+    ※ 한때 spreadsheets.get(includeGridData)로 1왕복 합치기를 시도했으나 폐기 —
+      fields 필터는 범위를 못 줄여 '좌표캐시' 탭(1000행 grid) 등 모든 탭의 전체
+      grid 가 응답에 끌려와, 좌표가 쌓일수록 오히려 느려졌다. 요약은 데이터 탭의
+      A3:O 만 읽는 batchGet 이 항상 가볍다.
+
+    탭 개명 직후에는 캐시된 옛 이름의 range 요청이 실패한다 — 그때 탭 메타 캐시를
+    지워(자가 치유) 다음 시도가 새 이름으로 회복되게 한다.
+    """
+    tabs = list_data_tabs(spreadsheet_id)
+    try:
+        summary = read_tabs_summary(spreadsheet_id, tabs)
+    except SheetsApiError as e:
+        if _is_missing_tab_error(e):
+            cache.delete(f"tcards:tabs:{spreadsheet_id}")  # 낡은 탭 이름 — 재조회 유도
+        raise
+    return tabs, summary
+
+
+def is_card_overview_cached(spreadsheet_id):
+    """
+    탭 목록 화면에 필요한 두 캐시(탭 메타+요약)가 모두 살아 있는지 — 로딩 스피너
+    힌트용(card_list 가 링크에 data-warm 을 심어, 빠른 전환에는 스피너를 생략).
+    API 를 부르지 않는 순수 캐시 조회.
+    """
+    return (
+        cache.get(f"tcards:tabs:{spreadsheet_id}", _CACHE_MISS) is not _CACHE_MISS
+        and cache.get(_summary_cache_key(spreadsheet_id), _CACHE_MISS) is not _CACHE_MISS
+    )
 
 
 def resolve_tab_title(spreadsheet_id, gid):
@@ -753,3 +873,17 @@ def add_visit_record(spreadsheet_id, tab_title, row_number, status, now_dt, expe
     _update_values(spreadsheet_id, row_range, [new_slots])
     _invalidate_body_cache(spreadsheet_id, tab_title)
     return new_cell
+
+
+# ─────────────────────────────────────────────────────────────
+# 시트 오류 판별 헬퍼
+# ─────────────────────────────────────────────────────────────
+def _is_missing_tab_error(exc):
+    """
+    SheetsApiError 가 '탭 없음'(존재하지 않는 탭 이름의 range 요청, 400
+    'Unable to parse range')에서 왔는지 판별한다 — 탭 개명 시 낡은 메타 캐시의
+    자가 치유(read_card_overview)에 쓰인다. execute() 가 HttpError 를 감쌀 때
+    원본을 __cause__ 로 이어두므로 그 메시지를 본다.
+    """
+    cause = exc.__cause__
+    return cause is not None and "Unable to parse range" in str(cause)

@@ -14,3 +14,4 @@ pillow>=12.0
 pypdfium2>=4.30
 pytz==2025.2
 sqlparse==0.5.3
+qrcode>=8.0

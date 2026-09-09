@@ -33,6 +33,20 @@ urlpatterns = [
         name="row_detail",
     ),
 
+    # 구역 전체 지도 — 탭의 모든 주소를 구글지도에 마커로 일괄 표시(읽기 전용)
+    path(
+        "<str:spreadsheet_id>/<int:gid>/map/",
+        user_views.address_map,
+        name="address_map",
+    ),
+
+    # 시트(카드) 전체 지도 — 모든 탭의 주소를 한 지도에(핀 라벨 = 탭 이름, 읽기 전용)
+    path(
+        "<str:spreadsheet_id>/map/",
+        user_views.card_map,
+        name="card_map",
+    ),
+
     # 지도 링크 중계 (iOS 구글맵 앱 스킴 우선 시도 → 웹 URL 폴백)
     path("maps/redirect/", user_views.maps_redirect, name="maps_redirect"),
 
@@ -46,6 +60,13 @@ urlpatterns = [
         "<str:spreadsheet_id>/<int:gid>/row/<int:row>/visit/",
         user_views.add_visit,
         name="add_visit",
+    ),
+    # 지도 화면의 지오코딩 결과를 '좌표캐시' 탭에 일괄 저장 (JSON body).
+    # 좌표캐시가 카드 단위라 엔드포인트도 카드 단위 — 탭/카드 지도 공용.
+    path(
+        "<str:spreadsheet_id>/map/coords/",
+        user_views.save_coords,
+        name="save_coords",
     ),
 
     path('<str:spreadsheet_id>/<int:gid>/release/',

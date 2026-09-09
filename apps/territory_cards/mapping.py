@@ -41,6 +41,12 @@ REVISIT_COL = "I"         # 재방 (용도 미정)
 ASSIGNEE_CELL = "J2"      # 임명받은 전도인 라벨+이름 셀
 VISIT_COLS = ["J", "K", "L", "M", "N", "O"]  # 방문기록 6칸 (좌→우로 회차 누적)
 
+# [레거시] 한때 지오코딩 좌표를 저장하던 숨김 탭 이름. 지금 좌표 캐시는 DB
+# (territory_cards.models.GeocodedAddress)에 있지만, 기존 시트에 이 탭이 남아 있는
+# 동안 구역 탭으로 오인되지 않도록 특수 탭 제외 목록(_SPECIAL_TABS)에는 계속 둔다.
+# 시트의 탭 자체는 수동 삭제 권장(순수 캐시였으므로 지워도 무해).
+COORDS_CACHE_TAB = "좌표캐시"
+
 # J2 는 라벨을 지우지 않고 뒤에 이름을 붙인다: "임명받은 전도인 : 홍길동 洪吉童".
 # 쓸 때 붙이는 라벨(전각 콜론). 읽을 때는 라벨/콜론 변형을 관대히 벗겨 이름만 뽑는다.
 ASSIGNEE_LABEL = "임명받은 전도인 :"
@@ -103,6 +109,28 @@ def parse_assignee_name(cell_value):
     # 남은 콜론(전각/반각)과 공백 제거.
     text = text.lstrip(":： \t")
     return text.strip()
+
+
+# 공동 봉사 표기의 이름 구분자: 쉼표/슬래시/가운뎃점/일본어 쉼표/공백.
+_ASSIGNEE_NAME_SEP = re.compile(r"[,/·、\s]+")
+
+
+def assignee_includes(assignee, my_name):
+    """
+    J2 담당자 이름(라벨 제거 후)에 `my_name` 이 들어 있는지.
+    복수 전도인이 한 카드를 함께 쓸 때 '홍길동, 김철수'처럼 덧붙여 적으므로,
+    정확 일치 또는 구분자로 나눈 토큰 중 하나가 내 이름이면 참.
+    부분 문자열 매칭은 하지 않는다('홍길' ≠ '홍길동').
+    'J2 = 내 이름' 판정(자동 진입·반납 허용·반납 버튼 표시)이 모두 이 함수를 쓴다.
+    """
+    assignee = (assignee or "").strip()
+    my_name = (my_name or "").strip()
+    if not assignee or not my_name:
+        return False
+    if assignee == my_name:
+        return True
+    return my_name in _ASSIGNEE_NAME_SEP.split(assignee)
+
 
 # 방문기록 셀 형식(실제 시트/드롭다운 확인 완료):
 #   '<상태> <YY/MM/DD> <오전|오후HH>'  ← 띄어쓰기 한 줄. (셀이 좁아 3줄로 보일 뿐)
@@ -199,6 +227,21 @@ def build_address(region, banchi):
     예: ('サンプル区見本町', '1-1-3') → 'サンプル区見本町1-1-3'. 빈 쪽은 생략.
     """
     return f"{(region or '').strip()}{(banchi or '').strip()}"
+
+
+# ─────────────────────────────────────────────────────────────
+# 지오코딩 쿼리 (DB 좌표캐시의 키)
+# ─────────────────────────────────────────────────────────────
+def build_geo_query(address):
+    """
+    표시용 주소(지역명+번지)를 지오코딩 쿼리로 만든다.
+    정확도를 위해 도도부현 접두가 없으면 '東京都' 를 붙인다(도쿄 전제 — CLAUDE.md 참고).
+    이 문자열이 그대로 DB 좌표캐시(GeocodedAddress.query)의 유니크 키가 된다.
+    """
+    address = (address or "").strip()
+    if not address:
+        return ""
+    return address if address.startswith("東京都") else f"東京都{address}"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -437,6 +480,56 @@ def summarize_tab_rows(rows_values, start_row=DATA_ROW_START):
             count += 1
             visit_cells.extend(visits)
     return {"count": count, "visit_cells": visit_cells}
+
+
+def rows_from_values(rows_values, start_row=DATA_ROW_START):
+    """
+    values batchGet 으로 읽은 A{start_row}:O 원시 값(행별 값 리스트)을
+    표시용 행 dict 리스트로 만든다 — 시트(카드) 전체 지도용 경량판.
+
+    _fetch_tab_rows(spreadsheets.get 기반)와 같은 규칙(끝 행 '참고' 라벨 탐지,
+    A열 fill-down, 빈 행 제외)을 따르되, values 라 하이퍼링크(H 지도 링크)가
+    없다 — 지도 화면은 좌표로 직접 링크를 만들므로 불필요.
+
+    반환: [{row, region, banchi, address, bldg, phone, visits, latest}, ...]
+    """
+    def val(row, letter):
+        idx = ord(letter.upper()) - ord("A")
+        if idx < len(row) and row[idx] is not None:
+            return str(row[idx]).strip()
+        return ""
+
+    # find_data_end_row 는 A1 부터의 리스트를 기대 → 앞을 빈 값으로 채운다.
+    col_a = [""] * (start_row - 1) + [val(row, "A") for row in rows_values or []]
+    end_row = find_data_end_row(col_a, start_row=start_row)
+
+    rows = []
+    last_region = ""  # A열은 병합/생략된 행이 있어 위 행 값을 이어받는다(fill-down)
+    for offset, row in enumerate(rows_values or []):
+        r = start_row + offset
+        if r > end_row:
+            break
+        region = val(row, REGION_COL)
+        if region:
+            last_region = region
+        banchi = build_banchi(val(row, "B"), val(row, "C"), val(row, "D"))
+        bldg = val(row, BLDG_COL)
+        phone = val(row, PHONE_COL)
+        visits = [val(row, c) for c in VISIT_COLS]
+        # 완전 빈 행(미사용 슬롯)은 스킵 — read_tab_rows 와 동일 기준.
+        if not any([banchi, bldg, phone, "".join(visits).strip()]):
+            continue
+        rows.append({
+            "row": r,
+            "region": last_region,
+            "banchi": banchi,
+            "address": build_address(last_region, banchi),
+            "bldg": bldg,
+            "phone": phone,
+            "visits": visits,
+            "latest": latest_visit(visits),
+        })
+    return rows
 
 
 # ─────────────────────────────────────────────────────────────
