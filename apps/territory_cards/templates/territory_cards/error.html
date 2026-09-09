@@ -1,14 +1,15 @@
 {% extends "base_with_tailwind.html" %}
-{% block title %}{{ title|default:"오류" }}{% endblock %}
-{% block header %}⚠️ {{ title|default:"오류" }}{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "오류" as default_title %}{{ title|default:default_title }}{% endblock %}
+{% block header %}{% trans "오류" as default_title %}⚠️ {{ title|default:default_title }}{% endblock %}
 
 {% block content %}
 <div class="max-w-md mx-auto">
   <div class="bg-white rounded-xl shadow p-6 text-center space-y-3">
     <p class="text-4xl">⚙️</p>
-    <h2 class="text-lg font-bold text-gray-800">구역카드를 불러올 수 없습니다</h2>
+    <h2 class="text-lg font-bold text-gray-800">{% trans "구역카드를 불러올 수 없습니다" %}</h2>
     <p class="text-sm text-gray-600">{{ message }}</p>
-    <p class="text-xs text-gray-400">{{ hint|default:"관리자에게 문의하세요." }}</p>
+    <p class="text-xs text-gray-400">{% trans "관리자에게 문의하세요." as default_hint %}{{ hint|default:default_hint }}</p>
   </div>
 </div>
 {% endblock %}

@@ -1,7 +1,7 @@
 {% extends "base_with_tailwind.html" %}
-{% load cards %}
-{% block title %}주소 목록{% endblock %}
-{% block header %}📍 주소 목록{% endblock %}
+{% load cards i18n %}
+{% block title %}{% trans "주소 목록" %}{% endblock %}
+{% block header %}📍 {% trans "주소 목록" %}{% endblock %}
 
 {% block content %}
 <div class="max-w-lg mx-auto">
@@ -12,30 +12,30 @@
         <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
         </svg>
-        구역 선택으로
+        {% trans "구역 선택으로" %}
       </a>
 
       <a href="{% url 'territory_cards:address_map' card.spreadsheet_id gid %}{% if view_only %}?view=1{% endif %}"
          class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg shadow-md hover:bg-blue-700 active:scale-95 transition">
-        🗺 전체 지도
+        🗺 {% trans "전체 지도" %}
       </a>
 
       {# 반납은 '시작'으로 자기 이름을 기록한 본인에게만 (열람 모드에서도 숨김) #}
       {% if not view_only and is_owner %}
       <button type="button" onclick="openReleaseModal()"
               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 rounded-lg shadow-md hover:bg-emerald-700 active:scale-95 transition">
-        🏁 반납하고 구역선택으로
+        🏁 {% trans "반납하고 구역선택으로" %}
       </button>
       {% endif %}
     </div>
 
     <h2 class="text-lg font-bold text-gray-800 mt-3 truncate">{{ card.name }} · {{ tab_title }}</h2>
     {% if assignee %}
-    <p class="text-xs text-gray-500 mt-1">임명받은 전도인: <span class="font-medium text-gray-700">{{ assignee }}</span></p>
+    <p class="text-xs text-gray-500 mt-1">{% trans "임명받은 전도인:" %} <span class="font-medium text-gray-700">{{ assignee }}</span></p>
     {% endif %}
     {% if view_only %}
     <p class="mt-2 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700 font-medium">
-      👁 열람 모드 — 기록·편집은 할 수 없습니다
+      👁 {% trans "열람 모드 — 기록·편집은 할 수 없습니다" %}
     </p>
     {% endif %}
   </div>
@@ -50,11 +50,11 @@
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
             {# 시트 행번호 배지 — 시트를 직접 보는 사람들과 같은 번호로 대화할 수 있게 #}
-            <p class="font-semibold text-blue-800"><span class="inline-block align-middle mr-1.5 px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] font-mono font-medium text-gray-500">{{ row.row }}행</span>{{ row.banchi }}{% if row.bldg %} <span class="text-gray-700 font-normal">{{ row.bldg }}</span>{% endif %}</p>
+            <p class="font-semibold text-blue-800"><span class="inline-block align-middle mr-1.5 px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] font-mono font-medium text-gray-500">{% blocktrans with n=row.row %}{{ n }}행{% endblocktrans %}</span>{{ row.banchi }}{% if row.bldg %} <span class="text-gray-700 font-normal">{{ row.bldg }}</span>{% endif %}</p>
             {% if row.latest %}
             <p class="mt-1 text-xs text-gray-500">🕒 {{ row.latest.date }} {{ row.latest.time }}</p>
             {% else %}
-            <p class="mt-1 text-xs text-gray-400">📭 방문 기록 없음</p>
+            <p class="mt-1 text-xs text-gray-400">📭 {% trans "방문 기록 없음" %}</p>
             {% endif %}
           </div>
           {% if row.latest %}
@@ -68,7 +68,7 @@
     {% endfor %}
   </ul>
   {% else %}
-  <p class="text-center text-gray-500 py-10">표시할 주소가 없습니다.</p>
+  <p class="text-center text-gray-500 py-10">{% trans "표시할 주소가 없습니다." %}</p>
   {% endif %}
 </div>
 
@@ -77,32 +77,31 @@
 <div id="releaseModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
   <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center space-y-4 transform transition-all">
     <p class="text-4xl">🏁</p>
-    <h3 class="text-lg font-bold text-gray-800">이 구역의 봉사를 마치시겠습니까?</h3>
-    
+    <h3 class="text-lg font-bold text-gray-800">{% trans "이 구역의 봉사를 마치시겠습니까?" %}</h3>
+
     <div class="text-sm text-gray-600 space-y-1 bg-gray-50 p-3 rounded-xl border border-gray-100">
-      <p><span class="text-gray-400">구역카드:</span> {{ card.name }}</p>
-      <p><span class="text-gray-400">구역:</span> {{ tab_title }}</p>
+      <p><span class="text-gray-400">{% trans "구역카드:" %}</span> {{ card.name }}</p>
+      <p><span class="text-gray-400">{% trans "구역:" %}</span> {{ tab_title }}</p>
       {% if assignee %}
-      <p class="text-xs text-gray-500 mt-1">현재 담당자: <span class="font-medium text-gray-700">{{ assignee }}</span></p>
+      <p class="text-xs text-gray-500 mt-1">{% trans "현재 담당자:" %} <span class="font-medium text-gray-700">{{ assignee }}</span></p>
       {% endif %}
     </div>
 
     <p class="text-xs text-gray-500 leading-relaxed">
-      반납하시면 담당 전도인 이름이 지워지고,<br>
-      구역 선택 목록 화면으로 이동합니다.
+      {% blocktrans %}반납하시면 담당 전도인 이름이 지워지고,<br>구역 선택 목록 화면으로 이동합니다.{% endblocktrans %}
     </p>
 
     <div class="flex gap-2 pt-2">
       <button type="button" onclick="closeReleaseModal()"
               class="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold text-sm active:bg-gray-200 transition">
-        취소
+        {% trans "취소" %}
       </button>
 
       <form method="post" action="{% url 'territory_cards:release_tab' card.spreadsheet_id gid %}" class="flex-1">
         {% csrf_token %}
         <button type="submit"
                 class="w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold text-sm active:bg-emerald-700 shadow-md transition">
-          반납하기
+          {% trans "반납하기" %}
         </button>
       </form>
     </div>

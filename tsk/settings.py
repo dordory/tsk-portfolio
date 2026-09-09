@@ -198,6 +198,7 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'tsk.middleware.LanguageMiddleware',   # ?lang= / 쿠키 기반 UI 언어 (기본 ko)
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -220,6 +221,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.i18n',
                 'tsk.context_processors.site_meta',
             ],
         },
@@ -262,7 +264,15 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+# UI 기본 언어는 한국어(템플릿·코드의 원문 = msgid 가 한국어). 영어는 locale/en 의 번역.
+# 언어 선택은 명시적(?lang=en → 쿠키)으로만 — Accept-Language 자동 판정은 하지 않는다
+# (tsk.middleware.LanguageMiddleware). 새 언어 추가 = LANGUAGES 항목 + makemessages -l <code>.
+LANGUAGE_CODE = 'ko'
+LANGUAGES = [
+    ('ko', '한국어'),
+    ('en', 'English'),
+]
+LOCALE_PATHS = [BASE_DIR / 'locale']
 
 TIME_ZONE = 'Asia/Tokyo'
 

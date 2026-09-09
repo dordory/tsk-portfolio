@@ -1,0 +1,517 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-10 00:26+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+#: apps/bible_reading/plan_data.py:170
+msgid "처음부터 순서대로"
+msgstr "In order, from the beginning"
+
+#: apps/bible_reading/plan_data.py:171
+msgid ""
+"계획표의 각 부분을 매일 하나씩 읽으면 1년 만에 성경 전체를 읽을 수 있습니다."
+msgstr "Read one portion of the schedule each day and you will finish the whole Bible in a year."
+
+#: apps/bible_reading/plan_data.py:179
+msgid "이스라엘 역사 살펴보기"
+msgstr "Overview of Israel's history"
+
+#: apps/bible_reading/plan_data.py:180
+msgid "하느님께서 이스라엘 사람들을 대하신 역사를 대략적으로 살펴봅니다."
+msgstr "A broad look at how God dealt with the people of Israel."
+
+#: apps/bible_reading/plan_data.py:188
+msgid "그리스도인 회중의 발전"
+msgstr "Growth of the Christian congregation"
+
+#: apps/bible_reading/plan_data.py:189
+msgid "그리스도인 회중이 어떻게 발전했는지 시간 순서대로 살펴봅니다."
+msgstr "Follows, in chronological order, how the Christian congregation developed."
+
+#: apps/bible_reading/templates/bible_reading/track_select.html:3
+#: apps/bible_reading/templates/bible_reading/track_select.html:4
+#: apps/bible_reading/templates/bible_reading/unit_list.html:3
+#: apps/bible_reading/templates/bible_reading/unit_list.html:4
+msgid "성경 읽기"
+msgstr "Bible Reading"
+
+#: apps/bible_reading/templates/bible_reading/track_select.html:8
+msgid "읽기 방식 선택"
+msgstr "Choose a reading plan"
+
+#: apps/bible_reading/templates/bible_reading/track_select.html:10
+msgid "어느 방식으로 읽어도 읽은 부분은 함께 기록됩니다."
+msgstr "Whichever plan you follow, portions you have read are recorded across all plans."
+
+#: apps/bible_reading/templates/bible_reading/track_select.html:40
+msgid ""
+"계획표에 따라 각 부분을 매일 하나씩 읽으면 1년 만에 성경 전체를 읽을 수 있습"
+"니다."
+msgstr "Following the schedule one portion a day, you will read the entire Bible in one year."
+
+#: apps/bible_reading/templates/bible_reading/unit_list.html:21
+msgid "읽기 방식 선택으로"
+msgstr "Back to reading plans"
+
+#: apps/bible_reading/templates/bible_reading/unit_list.html:46
+msgid "다음 읽을 부분"
+msgstr "Next portion"
+
+#: apps/bible_reading/templates/bible_reading/unit_list.html:48
+#: apps/bible_reading/templates/bible_reading/unit_list.html:101
+#, python-format
+msgid "%(ch)s장"
+msgstr "Chapters %(ch)s"
+
+#: apps/bible_reading/templates/bible_reading/unit_list.html:54
+msgid "본문 읽기"
+msgstr "Read online"
+
+#: apps/bible_reading/templates/bible_reading/unit_list.html:59
+msgid "완독했습니다!"
+msgstr "You have finished!"
+
+#: apps/bible_reading/templates/bible_reading/unit_list.html:101
+msgid "전체"
+msgstr "Entire book"
+
+#: apps/bible_reading/templates/bible_reading/unit_list.html:112
+msgid "좌우로 넘겨 다른 부분을 볼 수 있습니다"
+msgstr "Swipe left or right to see other sections"
+
+#: apps/bible_reading/templates/bible_reading/unit_list.html:220
+msgid "저장하지 못했습니다. 잠시 후 다시 시도해 주세요."
+msgstr "Could not save. Please try again shortly."
+
+#: apps/territory/templates/territory/login.html:4
+msgid "로그인"
+msgstr "Sign in"
+
+#: apps/territory/templates/territory/login.html:5
+msgid "사용자 선택"
+msgstr "Choose your name"
+
+#: apps/territory/templates/territory/login.html:10
+msgid "자신의 이름을 선택하신 후에 본인 확인용 인증코드를 입력하세요"
+msgstr "Select your name, then enter your invite code to verify your identity"
+
+#: apps/territory/templates/territory/login.html:14
+#, python-format
+msgid "%(name)s 그룹"
+msgstr "%(name)s group"
+
+#: apps/territory/templates/territory/login.html:35
+msgid "등록된 사용자가 없습니다."
+msgstr "No registered members."
+
+#: apps/territory/templates/territory/login.html:41
+msgid ""
+"명단에 이름이 없거나 본인이 이미 🔗(연결됨)로 표시되면 관리자에게 문의하세요."
+msgstr "If your name is missing or already marked 🔗 (linked), please contact an administrator."
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:3
+#: apps/territory_cards/templates/territory_cards/address_list.html:4
+msgid "주소 목록"
+msgstr "Addresses"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:15
+msgid "구역 선택으로"
+msgstr "Back to territories"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:20
+#: apps/territory_cards/templates/territory_cards/tab_list.html:22
+msgid "전체 지도"
+msgstr "Map"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:27
+msgid "반납하고 구역선택으로"
+msgstr "Return territory"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:34
+msgid "임명받은 전도인:"
+msgstr "Assigned publisher:"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:38
+msgid "열람 모드 — 기록·편집은 할 수 없습니다"
+msgstr "View only — recording and editing are disabled"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:53
+#, python-format
+msgid "%(n)s행"
+msgstr "Row %(n)s"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:57
+msgid "방문 기록 없음"
+msgstr "No visits yet"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:71
+msgid "표시할 주소가 없습니다."
+msgstr "No addresses to show."
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:80
+msgid "이 구역의 봉사를 마치시겠습니까?"
+msgstr "Finish working this territory?"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:83
+msgid "구역카드:"
+msgstr "Territory card:"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:84
+msgid "구역:"
+msgstr "Territory:"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:86
+msgid "현재 담당자:"
+msgstr "Currently assigned to:"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:91
+msgid ""
+"반납하시면 담당 전도인 이름이 지워지고,<br>구역 선택 목록 화면으로 이동합니"
+"다."
+msgstr "Returning clears the assigned publisher's name<br>and takes you back to the territory list."
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:97
+#: apps/territory_cards/templates/territory_cards/enter_notice.html:33
+#: apps/territory_cards/templates/territory_cards/enter_warning.html:33
+msgid "취소"
+msgstr "Cancel"
+
+#: apps/territory_cards/templates/territory_cards/address_list.html:104
+msgid "반납하기"
+msgstr "Return"
+
+#: apps/territory_cards/templates/territory_cards/card_list.html:3
+#: apps/territory_cards/templates/territory_cards/card_list.html:4
+#: apps/territory_cards/templates/territory_cards/card_list.html:8
+#: tsk/tests.py:174 tsk/tests.py:176
+msgid "구역카드 목록"
+msgstr "Territory Cards"
+
+#: apps/territory_cards/templates/territory_cards/card_list.html:22
+#, python-format
+msgid "구역 %(count)s개"
+msgstr "%(count)s territories"
+
+#: apps/territory_cards/templates/territory_cards/card_list.html:24
+msgid "구역 수 미상"
+msgstr "Territory count unknown"
+
+#: apps/territory_cards/templates/territory_cards/card_list.html:33
+msgid "접근 가능한 구역카드가 없습니다."
+msgstr "No territory cards available."
+
+#: apps/territory_cards/templates/territory_cards/enter_notice.html:3
+#: apps/territory_cards/templates/territory_cards/enter_notice.html:4
+msgid "봉사 시작"
+msgstr "Start Working"
+
+#: apps/territory_cards/templates/territory_cards/enter_notice.html:10
+msgid "이 구역의 봉사를 시작합니다"
+msgstr "Start working this territory"
+
+#: apps/territory_cards/templates/territory_cards/enter_notice.html:12
+#: apps/territory_cards/templates/territory_cards/enter_warning.html:12
+msgid "구역카드"
+msgstr "Territory card"
+
+#: apps/territory_cards/templates/territory_cards/enter_notice.html:13
+#: apps/territory_cards/templates/territory_cards/enter_warning.html:13
+msgid "구역"
+msgstr "Territory"
+
+#: apps/territory_cards/templates/territory_cards/enter_notice.html:16
+msgid ""
+"임명받은 전도인 이름을 기록하고 봉사를 시작하거나, 이름을 기록하지 않고 열람"
+"만 할 수 있습니다."
+msgstr "Record the assigned publisher's name and start working, or just view the territory without recording a name."
+
+#: apps/territory_cards/templates/territory_cards/enter_notice.html:27
+msgid "함께 봉사하는 전도인이 있으면 이름을 덧붙여 수정할 수 있습니다."
+msgstr "If others are working with you, you can add their names here."
+
+#: apps/territory_cards/templates/territory_cards/enter_notice.html:37
+msgid "시작"
+msgstr "Start"
+
+#: apps/territory_cards/templates/territory_cards/enter_notice.html:41
+#: apps/territory_cards/templates/territory_cards/enter_warning.html:41
+msgid "열람"
+msgstr "View"
+
+#: apps/territory_cards/templates/territory_cards/enter_warning.html:3
+#: apps/territory_cards/templates/territory_cards/enter_warning.html:4
+msgid "할당 확인"
+msgstr "Already Assigned"
+
+#: apps/territory_cards/templates/territory_cards/enter_warning.html:10
+msgid "이미 다른 사람에게 할당된 구역입니다"
+msgstr "This territory is already assigned to someone else"
+
+#: apps/territory_cards/templates/territory_cards/enter_warning.html:16
+msgid ""
+"현재 임명받은 전도인이 기록되어 있습니다. 임명받은 봉사자를 기록하고 봉사를 "
+"시작하거나, 열람만 할 수도 있습니다."
+msgstr "A publisher is currently recorded for this territory. Record the assigned publisher and start working, or just view it."
+
+#: apps/territory_cards/templates/territory_cards/enter_warning.html:27
+#, python-format
+msgid "함께 봉사하면 '%(current)s, %(me)s'처럼 이름을 덧붙이세요."
+msgstr "If you are working together, add your name like '%(current)s, %(me)s'."
+
+#: apps/territory_cards/templates/territory_cards/enter_warning.html:37
+msgid "계속"
+msgstr "Continue"
+
+#: apps/territory_cards/templates/territory_cards/error.html:3
+#: apps/territory_cards/templates/territory_cards/error.html:4
+msgid "오류"
+msgstr "Error"
+
+#: apps/territory_cards/templates/territory_cards/error.html:10
+msgid "구역카드를 불러올 수 없습니다"
+msgstr "Could not load the territory card"
+
+#: apps/territory_cards/templates/territory_cards/error.html:12
+#: apps/territory_cards/user_views.py:71
+msgid "관리자에게 문의하세요."
+msgstr "Please contact an administrator."
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:3
+#: apps/territory_cards/templates/territory_cards/row_detail.html:4
+msgid "방문기록"
+msgstr "Visit Record"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:20
+msgid "주소 목록으로"
+msgstr "Back to addresses"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:24
+msgid "열람 모드"
+msgstr "View only"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:32
+#, python-format
+msgid "시트 %(n)s행"
+msgstr "Sheet row %(n)s"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:45
+msgid "지도"
+msgstr "Map"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:53
+msgid "메모"
+msgstr "Notes"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:58
+msgid "메모 없음"
+msgstr "No notes"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:63
+msgid "이 주소에 대한 메모"
+msgstr "Notes about this address"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:68
+msgid "저장 중…"
+msgstr "Saving…"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:68
+msgid "메모저장"
+msgstr "Save notes"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:76
+msgid "방문 이력"
+msgstr "Visit history"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:86
+msgid "방문 기록이 없습니다."
+msgstr "No visits recorded."
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:92
+msgid "방문결과 기록"
+msgstr "Record a visit"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:93
+msgid "상태만 선택하면 날짜·시간(JST)은 자동으로 기록됩니다."
+msgstr "Pick a result; the date and time (JST) are recorded automatically."
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:97
+msgid "상태 선택…"
+msgstr "Select a result…"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:104
+msgid "기록 중…"
+msgstr "Recording…"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:104
+msgid "기록"
+msgstr "Record"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:117
+msgid "저장하지 못했습니다"
+msgstr "Could not save"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:121
+msgid "주소 목록으로 돌아가기"
+msgstr "Back to addresses"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:179
+msgid "저장됨"
+msgstr "Saved"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:180
+#: apps/territory_cards/templates/territory_cards/row_detail.html:205
+msgid "시트가 변경되어 저장하지 못했습니다."
+msgstr "The sheet has changed, so this could not be saved."
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:181
+msgid "저장 실패"
+msgstr "Save failed"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:182
+#: apps/territory_cards/templates/territory_cards/row_detail.html:209
+msgid "네트워크 오류"
+msgstr "Network error"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:203
+msgid "기록됨"
+msgstr "Recorded"
+
+#: apps/territory_cards/templates/territory_cards/row_detail.html:207
+msgid "기록 실패"
+msgstr "Recording failed"
+
+#: apps/territory_cards/templates/territory_cards/tab_list.html:3
+#: apps/territory_cards/templates/territory_cards/tab_list.html:4
+msgid "시트 선택"
+msgstr "Choose a Territory"
+
+#: apps/territory_cards/templates/territory_cards/tab_list.html:15
+msgid "구역카드 목록으로 돌아가기"
+msgstr "Back to territory cards"
+
+#: apps/territory_cards/templates/territory_cards/tab_list.html:27
+msgid "배정받은 구역을 선택하세요."
+msgstr "Select the territory assigned to you."
+
+#: apps/territory_cards/templates/territory_cards/tab_list.html:33
+msgid "최근 방문일"
+msgstr "Last visited"
+
+#: apps/territory_cards/templates/territory_cards/tab_list.html:36
+msgid "2개월 이내"
+msgstr "Within 2 months"
+
+#: apps/territory_cards/templates/territory_cards/tab_list.html:39
+msgid "2~3개월"
+msgstr "2–3 months ago"
+
+#: apps/territory_cards/templates/territory_cards/tab_list.html:42
+msgid "3개월 초과·기록 없음"
+msgstr "Over 3 months or no record"
+
+#: apps/territory_cards/templates/territory_cards/tab_list.html:48
+msgid "배정 상태:"
+msgstr "Assignment:"
+
+#: apps/territory_cards/templates/territory_cards/tab_list.html:50
+msgid "👤가 있는 시트는 배정된 시트입니다."
+msgstr "Territories marked 👤 are already assigned."
+
+#: apps/territory_cards/templates/territory_cards/tab_list.html:68
+#, python-format
+msgid "%(count)s건"
+msgstr "%(count)s"
+
+#: apps/territory_cards/templates/territory_cards/tab_list.html:76
+msgid "표시할 구역 탭이 없습니다."
+msgstr "No territory tabs to show."
+
+#: apps/territory_cards/user_views.py:71
+msgid "설정 오류"
+msgstr "Configuration error"
+
+#: apps/territory_cards/user_views.py:73
+msgid "일시적인 오류"
+msgstr "Temporary error"
+
+#: apps/territory_cards/user_views.py:73
+msgid "잠시 후 다시 시도해 주세요."
+msgstr "Please try again shortly."
+
+#: apps/territory_cards/user_views.py:115
+#: apps/territory_cards/user_views.py:397
+msgid "해당 구역카드를 찾을 수 없습니다."
+msgstr "Territory card not found."
+
+#: apps/territory_cards/user_views.py:131
+msgid "임명받은 전도인 : 없음"
+msgstr "Unassigned"
+
+#: apps/territory_cards/user_views.py:163
+#: apps/territory_cards/user_views.py:217
+#: apps/territory_cards/user_views.py:249
+#: apps/territory_cards/user_views.py:329
+#: apps/territory_cards/user_views.py:455
+#: apps/territory_cards/user_views.py:530
+msgid "해당 탭을 찾을 수 없습니다."
+msgstr "Territory tab not found."
+
+#: apps/territory_cards/user_views.py:225
+msgid "반납할 수 없습니다"
+msgstr "Cannot return this territory"
+
+#: apps/territory_cards/user_views.py:226
+msgid "본인이 담당 중인 구역만 반납할 수 있습니다."
+msgstr "You can only return a territory assigned to you."
+
+#: apps/territory_cards/user_views.py:227
+msgid "구역 선택 화면에서 다시 확인해 주세요."
+msgstr "Please check again from the territory list."
+
+#: apps/territory_cards/user_views.py:387
+msgid "접근 권한이 없습니다"
+msgstr "Access denied"
+
+#: apps/territory_cards/user_views.py:388
+msgid "시트 전체 지도는 관리자용 화면입니다."
+msgstr "The whole-card map is an administrator screen."
+
+#: apps/territory_cards/user_views.py:389
+msgid "구역 선택 화면에서 각 구역의 지도를 이용해 주세요."
+msgstr "Please use each territory's map from the territory list."
+
+#: apps/territory_cards/user_views.py:459
+msgid "해당 주소 행을 찾을 수 없습니다."
+msgstr "Address row not found."
+
+#: apps/territory_cards/user_views.py:579
+msgid "상태를 선택하세요."
+msgstr "Please select a result."
+
+#: apps/territory_cards/user_views.py:585
+msgid "올바르지 않은 상태값입니다."
+msgstr "Invalid result value."
+
+#: templates/base_with_tailwind.html:69
+#, python-format
+msgid "%(name)s 구역관리"
+msgstr "%(name)s Territory Manager"
+
+#: templates/base_with_tailwind.html:82
+#, python-format
+msgid "%(name)s 구역관리 시스템"
+msgstr "%(name)s Territory Management System"

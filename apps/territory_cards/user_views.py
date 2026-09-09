@@ -18,6 +18,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, Http404
 from django.shortcuts import render, redirect
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
@@ -67,9 +68,9 @@ def _is_card_map_allowed(user):
 def _sheets_error_response(request, exc):
     """시트 계층 오류 안내 화면 — 설정 누락과 일시 오류를 구분해 문구를 바꾼다."""
     if isinstance(exc, SheetsConfigError):
-        title, hint = "설정 오류", "관리자에게 문의하세요."
+        title, hint = _("설정 오류"), _("관리자에게 문의하세요.")
     else:
-        title, hint = "일시적인 오류", "잠시 후 다시 시도해 주세요."
+        title, hint = _("일시적인 오류"), _("잠시 후 다시 시도해 주세요.")
     return render(
         request,
         _tpl(request, "territory_cards/error.html"),
@@ -111,7 +112,7 @@ def tab_list(request, spreadsheet_id):
     try:
         card = sheets.get_card(spreadsheet_id)
         if card is None:
-            raise Http404("해당 구역카드를 찾을 수 없습니다.")
+            raise Http404(_("해당 구역카드를 찾을 수 없습니다."))
         # 탭 목록 + 탭별 담당자(J2)·최근 방문일(타일 표시용)을 1왕복으로
         # (콜드 로드 단축 — read_card_overview 참고).
         tabs, summary = sheets.read_card_overview(spreadsheet_id)
@@ -126,7 +127,8 @@ def tab_list(request, spreadsheet_id):
         # 표시는 J2 원본 그대로. 미배정이면 '임명받은 전도인 : 없음'.
         name = mapping.parse_assignee_name(raw_j2)
         t["assigned"] = bool(name)
-        t["assignee"] = raw_j2 if name else f"{mapping.ASSIGNEE_LABEL} 없음"
+        # 미배정 표기는 시트 내용이 아니라 UI 문구라 번역 대상(배정된 타일의 J2 원본은 그대로).
+        t["assignee"] = raw_j2 if name else _("임명받은 전도인 : 없음")
         t["count"] = s.get("count", 0)
         t["color"] = mapping.visit_recency_color(s.get("latest_date"), today)
 
@@ -158,7 +160,7 @@ def enter_tab(request, spreadsheet_id, gid):
     try:
         tab_title = sheets.resolve_tab_title(spreadsheet_id, gid)
         if tab_title is None:
-            raise Http404("해당 탭을 찾을 수 없습니다.")
+            raise Http404(_("해당 탭을 찾을 수 없습니다."))
 
         my_name = _assignee_name(request)
         current = sheets.read_assignee(spreadsheet_id, tab_title)  # 이름만(라벨 제거)
@@ -212,7 +214,7 @@ def release_tab(request, spreadsheet_id, gid):
     try:
         tab_title = sheets.resolve_tab_title(spreadsheet_id, gid)
         if tab_title is None:
-            raise Http404("해당 탭을 찾을 수 없습니다.")
+            raise Http404(_("해당 탭을 찾을 수 없습니다."))
 
         current = sheets.read_assignee(spreadsheet_id, tab_title)  # 이름만(라벨 제거)
         if not mapping.assignee_includes(current, _assignee_name(request)):
@@ -220,9 +222,9 @@ def release_tab(request, spreadsheet_id, gid):
                 request,
                 _tpl(request, "territory_cards/error.html"),
                 {
-                    "title": "반납할 수 없습니다",
-                    "message": "본인이 담당 중인 구역만 반납할 수 있습니다.",
-                    "hint": "구역 선택 화면에서 다시 확인해 주세요.",
+                    "title": _("반납할 수 없습니다"),
+                    "message": _("본인이 담당 중인 구역만 반납할 수 있습니다."),
+                    "hint": _("구역 선택 화면에서 다시 확인해 주세요."),
                 },
                 status=403,
             )
@@ -244,7 +246,7 @@ def address_list(request, spreadsheet_id, gid):
     try:
         tab_title = sheets.resolve_tab_title(spreadsheet_id, gid)
         if tab_title is None:
-            raise Http404("해당 탭을 찾을 수 없습니다.")
+            raise Http404(_("해당 탭을 찾을 수 없습니다."))
         card = sheets.get_card(spreadsheet_id)
         data = sheets.read_tab_rows(spreadsheet_id, tab_title)
     except SHEETS_ERRORS as e:
@@ -324,7 +326,7 @@ def address_map(request, spreadsheet_id, gid):
     try:
         tab_title = sheets.resolve_tab_title(spreadsheet_id, gid)
         if tab_title is None:
-            raise Http404("해당 탭을 찾을 수 없습니다.")
+            raise Http404(_("해당 탭을 찾을 수 없습니다."))
         card = sheets.get_card(spreadsheet_id)
         data = sheets.read_tab_rows(spreadsheet_id, tab_title)
     except SHEETS_ERRORS as e:
@@ -382,9 +384,9 @@ def card_map(request, spreadsheet_id):
             request,
             _tpl(request, "territory_cards/error.html"),
             {
-                "title": "접근 권한이 없습니다",
-                "message": "시트 전체 지도는 관리자용 화면입니다.",
-                "hint": "구역 선택 화면에서 각 구역의 지도를 이용해 주세요.",
+                "title": _("접근 권한이 없습니다"),
+                "message": _("시트 전체 지도는 관리자용 화면입니다."),
+                "hint": _("구역 선택 화면에서 각 구역의 지도를 이용해 주세요."),
             },
             status=403,
         )
@@ -392,7 +394,7 @@ def card_map(request, spreadsheet_id):
     try:
         card = sheets.get_card(spreadsheet_id)
         if card is None:
-            raise Http404("해당 구역카드를 찾을 수 없습니다.")
+            raise Http404(_("해당 구역카드를 찾을 수 없습니다."))
         tabs = sheets.list_data_tabs(spreadsheet_id)
         rows_by_tab = sheets.read_card_rows(spreadsheet_id, tabs)
     except SHEETS_ERRORS as e:
@@ -450,11 +452,11 @@ def row_detail(request, spreadsheet_id, gid, row):
     try:
         tab_title = sheets.resolve_tab_title(spreadsheet_id, gid)
         if tab_title is None:
-            raise Http404("해당 탭을 찾을 수 없습니다.")
+            raise Http404(_("해당 탭을 찾을 수 없습니다."))
         card = sheets.get_card(spreadsheet_id)
         row_data = sheets.read_row(spreadsheet_id, tab_title, row)
         if row_data is None:
-            raise Http404("해당 주소 행을 찾을 수 없습니다.")
+            raise Http404(_("해당 주소 행을 찾을 수 없습니다."))
         status_options = sheets.read_status_options(spreadsheet_id)
     except SHEETS_ERRORS as e:
         return _sheets_error_response(request, e)
@@ -525,7 +527,7 @@ def maps_redirect(request):
 def _resolve_or_400(spreadsheet_id, gid):
     tab_title = sheets.resolve_tab_title(spreadsheet_id, gid)
     if tab_title is None:
-        raise Http404("해당 탭을 찾을 수 없습니다.")
+        raise Http404(_("해당 탭을 찾을 수 없습니다."))
     return tab_title
 
 
@@ -574,13 +576,13 @@ def add_visit(request, spreadsheet_id, gid, row):
         tab_title = _resolve_or_400(spreadsheet_id, gid)
         status = request.POST.get("status", "").strip()
         if not status:
-            return JsonResponse({"error": "상태를 선택하세요."}, status=400)
+            return JsonResponse({"error": _("상태를 선택하세요.")}, status=400)
 
         # 상태값은 화면 드롭다운과 같은 소스('삭제금지' 탭, 캐시됨)로 검증한다 —
         # 임의 문자열이 방문셀에 들어가는 것을 차단. 목록을 못 읽은 경우(빈 목록)만 통과.
         options = sheets.read_status_options(spreadsheet_id)
         if options and status not in options:
-            return JsonResponse({"error": "올바르지 않은 상태값입니다."}, status=400)
+            return JsonResponse({"error": _("올바르지 않은 상태값입니다.")}, status=400)
 
         now_dt = timezone.localtime()  # settings.TIME_ZONE = 'Asia/Tokyo'
         new_cell = sheets.add_visit_record(

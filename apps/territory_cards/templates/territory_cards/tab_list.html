@@ -1,6 +1,7 @@
 {% extends "base_with_tailwind.html" %}
-{% block title %}시트 선택{% endblock %}
-{% block header %}📑 시트 선택{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "시트 선택" %}{% endblock %}
+{% block header %}📑 {% trans "시트 선택" %}{% endblock %}
 
 {% block content %}
 <div class="max-w-lg mx-auto">
@@ -11,42 +12,42 @@
         <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
         </svg>
-        구역카드 목록으로 돌아가기
+        {% trans "구역카드 목록으로 돌아가기" %}
       </a>
 
       {# 시트(카드) 전체 지도 — staff/superuser 전용(card_map 뷰의 서버 검사와 동일 조건) #}
       {% if can_view_card_map %}
       <a href="{% url 'territory_cards:card_map' card.spreadsheet_id %}"
          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg shadow-md hover:bg-blue-700 active:scale-95 transition">
-        🗺 전체 지도
+        🗺 {% trans "전체 지도" %}
       </a>
       {% endif %}
     </div>
     <h2 class="text-lg font-bold text-gray-800 mt-3 truncate">{{ card.name }}</h2>
-    <p class="text-xs text-gray-500 mt-1">배정받은 구역을 선택하세요.</p>
+    <p class="text-xs text-gray-500 mt-1">{% trans "배정받은 구역을 선택하세요." %}</p>
   </div>
 
   {# 범례 — 타일 색은 mapping.LAST_VISIT_COLORS 와 동기화 유지 #}
   <div class="mb-5 p-3 bg-white/80 rounded-xl shadow-sm border border-gray-200 text-xs text-gray-700 space-y-2">
     <div>
-      <span class="font-semibold text-gray-800 block mb-1">📅 최근 방문일</span>
+      <span class="font-semibold text-gray-800 block mb-1">📅 {% trans "최근 방문일" %}</span>
       <div class="flex flex-wrap gap-2 text-[11px]">
         <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-emerald-300 bg-emerald-100 text-emerald-800">
-          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 2개월 이내
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> {% trans "2개월 이내" %}
         </span>
         <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-orange-300 bg-orange-100 text-orange-800">
-          <span class="w-2 h-2 rounded-full bg-orange-500"></span> 2~3개월
+          <span class="w-2 h-2 rounded-full bg-orange-500"></span> {% trans "2~3개월" %}
         </span>
         <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-red-300 bg-red-100 text-red-800">
-          <span class="w-2 h-2 rounded-full bg-red-500"></span> 3개월 초과·기록 없음
+          <span class="w-2 h-2 rounded-full bg-red-500"></span> {% trans "3개월 초과·기록 없음" %}
         </span>
       </div>
     </div>
 
     <div class="pt-2 border-t border-gray-100 flex items-center gap-2 text-[11px]">
-      <span class="font-semibold text-gray-800 shrink-0">📌 배정 상태:</span>
+      <span class="font-semibold text-gray-800 shrink-0">📌 {% trans "배정 상태:" %}</span>
       <span class="text-gray-600 opacity-80 text-right">
-        👤가 있는 시트는 배정된 시트입니다.
+        {% trans "👤가 있는 시트는 배정된 시트입니다." %}
       </span>
     </div>
   </div>
@@ -64,7 +65,7 @@
                      {% if tab.assigned %}opacity-60{% endif %}
                      active:bg-blue-50 transition">
         {# 실제 탭 이름 + 구역 데이터 건수. 예: 1A (16건) #}
-        <span class="text-2xl font-bold text-blue-800">{{ tab.title }} <span class="text-sm font-semibold">({{ tab.count }}건)</span></span>
+        <span class="text-2xl font-bold text-blue-800">{{ tab.title }} <span class="text-sm font-semibold">({% blocktrans with count=tab.count %}{{ count }}건{% endblocktrans %})</span></span>
         {# J2 셀 내용 그대로 (미배정이면 '임명받은 전도인 : 없음'). 두 줄까지 표시해 이름이 보이도록. #}
         <span class="text-[10px] text-gray-600 mt-1 px-1 leading-tight break-all line-clamp-2 max-w-full">{% if tab.assigned %}👤 {% endif %}{{ tab.assignee }}</span>
       </button>
@@ -72,7 +73,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <p class="text-center text-gray-500 py-10">표시할 구역 탭이 없습니다.</p>
+  <p class="text-center text-gray-500 py-10">{% trans "표시할 구역 탭이 없습니다." %}</p>
   {% endif %}
 </div>
 {% endblock %}

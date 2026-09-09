@@ -1,18 +1,19 @@
 {% extends "base_with_tailwind.html" %}
-{% block title %}할당 확인{% endblock %}
-{% block header %}⚠️ 할당 확인{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "할당 확인" %}{% endblock %}
+{% block header %}⚠️ {% trans "할당 확인" %}{% endblock %}
 
 {% block content %}
 <div class="max-w-md mx-auto">
   <div class="bg-white rounded-xl shadow p-6 text-center space-y-4">
     <p class="text-4xl">⚠️</p>
-    <h2 class="text-lg font-bold text-gray-800">이미 다른 사람에게 할당된 구역입니다</h2>
+    <h2 class="text-lg font-bold text-gray-800">{% trans "이미 다른 사람에게 할당된 구역입니다" %}</h2>
     <div class="text-sm text-gray-600 space-y-1">
-      <p><span class="text-gray-400">구역카드</span> {{ card.name }}</p>
-      <p><span class="text-gray-400">구역</span> {{ tab_title }}</p>
+      <p><span class="text-gray-400">{% trans "구역카드" %}</span> {{ card.name }}</p>
+      <p><span class="text-gray-400">{% trans "구역" %}</span> {{ tab_title }}</p>
     </div>
     <p class="text-sm text-gray-700">
-      현재 임명받은 전도인이 기록되어 있습니다. 임명받은 봉사자를 기록하고 봉사를 시작하거나, 열람만 할 수도 있습니다.
+      {% trans "현재 임명받은 전도인이 기록되어 있습니다. 임명받은 봉사자를 기록하고 봉사를 시작하거나, 열람만 할 수도 있습니다." %}
     </p>
 
     <form method="post" action="{% url 'territory_cards:enter_tab' card.spreadsheet_id gid %}" class="space-y-4">
@@ -23,21 +24,21 @@
         <input type="text" name="assignee" value="{{ default_assignee }}"
                autocomplete="off" autocapitalize="off" spellcheck="false"
                class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base text-center text-gray-800">
-        <p class="text-xs text-gray-400">함께 봉사하면 '{{ current_assignee }}, {{ my_name }}'처럼 이름을 덧붙이세요.</p>
+        <p class="text-xs text-gray-400">{% blocktrans with current=current_assignee me=my_name %}함께 봉사하면 '{{ current }}, {{ me }}'처럼 이름을 덧붙이세요.{% endblocktrans %}</p>
       </div>
 
       <div class="flex gap-3 pt-2">
         <a href="{% url 'territory_cards:tab_list' card.spreadsheet_id %}" data-warm="1"
            class="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold active:bg-gray-200 transition">
-          취소
+          {% trans "취소" %}
         </a>
         <button type="submit"
                 class="flex-1 py-3 rounded-xl bg-blue-600 text-white font-semibold active:bg-blue-700 transition">
-          계속
+          {% trans "계속" %}
         </button>
         <a href="{% url 'territory_cards:address_list' card.spreadsheet_id gid %}?view=1"
            class="flex-1 py-3 rounded-xl bg-white border border-blue-300 text-blue-700 font-semibold active:bg-blue-50 transition">
-          열람
+          {% trans "열람" %}
         </a>
       </div>
     </form>

@@ -1,16 +1,17 @@
 {% extends "base_with_tailwind.html" %}
+{% load i18n %}
 
-{% block title %}로그인{% endblock %}
-{% block header %}👤 사용자 선택{% endblock %}
+{% block title %}{% trans "로그인" %}{% endblock %}
+{% block header %}👤 {% trans "사용자 선택" %}{% endblock %}
 
 {% block content %}
 {% if onboarding %}
 <div class="max-w-3xl mx-auto mb-4 text-center text-sm text-gray-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-  자신의 이름을 선택하신 후에 본인 확인용 인증코드를 입력하세요
+  {% trans "자신의 이름을 선택하신 후에 본인 확인용 인증코드를 입력하세요" %}
 </div>
 {% endif %}
 <div class="max-w-3xl mx-auto text-center {{ group.bg_color }} pt-1 pl-4 pr-4 pb-4">
-  <h1 class="text-xl sm:text-xl font-bold mt-1 mb-3 {{ group.text_color }}">{{ group.symbol }} {{ group.name }} 그룹</h1>
+  <h1 class="text-xl sm:text-xl font-bold mt-1 mb-3 {{ group.text_color }}">{{ group.symbol }} {% blocktrans with name=group.name %}{{ name }} 그룹{% endblocktrans %}</h1>
   <!-- p class="text-gray-600 mb-8">로그인할 사용자를 선택해주세요.</p -->
 
   <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
@@ -31,13 +32,13 @@
         </form>
         {% endif %}
     {% empty %}
-        <p class="text-gray-500 col-span-full text-center">등록된 사용자가 없습니다.</p>
+        <p class="text-gray-500 col-span-full text-center">{% trans "등록된 사용자가 없습니다." %}</p>
     {% endfor %}
   </div>
 
   {% if onboarding %}
   <p class="text-sm text-gray-500 mt-6">
-    명단에 이름이 없거나 본인이 이미 🔗(연결됨)로 표시되면 관리자에게 문의하세요.
+    {% trans "명단에 이름이 없거나 본인이 이미 🔗(연결됨)로 표시되면 관리자에게 문의하세요." %}
   </p>
   {% endif %}
 </div>

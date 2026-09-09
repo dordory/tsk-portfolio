@@ -161,11 +161,14 @@ Track = namedtuple(
     ["slug", "title", "subtitle", "symbol", "symbol_class", "bar_class", "predicate"],
 )
 
+# 트랙 제목/설명은 UI 문구라 번역 대상(지연 평가 — 요청 언어로 렌더). 책 이름·계획표 본문은 데이터라 번역 안 함.
+from django.utils.translation import gettext_lazy as _  # noqa: E402
+
 TRACKS = (
     Track(
         slug="all",
-        title="처음부터 순서대로",
-        subtitle="계획표의 각 부분을 매일 하나씩 읽으면 1년 만에 성경 전체를 읽을 수 있습니다.",
+        title=_("처음부터 순서대로"),
+        subtitle=_("계획표의 각 부분을 매일 하나씩 읽으면 1년 만에 성경 전체를 읽을 수 있습니다."),
         symbol="📖",
         symbol_class="text-amber-600",
         bar_class="bg-amber-500",
@@ -173,8 +176,8 @@ TRACKS = (
     ),
     Track(
         slug="israel",
-        title="이스라엘 역사 살펴보기",
-        subtitle="하느님께서 이스라엘 사람들을 대하신 역사를 대략적으로 살펴봅니다.",
+        title=_("이스라엘 역사 살펴보기"),
+        subtitle=_("하느님께서 이스라엘 사람들을 대하신 역사를 대략적으로 살펴봅니다."),
         symbol="♦",
         symbol_class="text-red-600",
         bar_class="bg-red-500",
@@ -182,8 +185,8 @@ TRACKS = (
     ),
     Track(
         slug="congregation",
-        title="그리스도인 회중의 발전",
-        subtitle="그리스도인 회중이 어떻게 발전했는지 시간 순서대로 살펴봅니다.",
+        title=_("그리스도인 회중의 발전"),
+        subtitle=_("그리스도인 회중이 어떻게 발전했는지 시간 순서대로 살펴봅니다."),
         symbol="●",
         symbol_class="text-blue-600",
         bar_class="bg-blue-500",

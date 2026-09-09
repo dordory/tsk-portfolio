@@ -95,6 +95,99 @@ class ErrorPageTests(TestCase):
         self.assertNotIn("{{", content)        # 미해석 템플릿 변수 없음(독립성 검증)
 
 
+class LanguageMiddlewareTests(TestCase):
+    """UI 언어 선택 — 기본 ko, ?lang=en 은 쿠키로 유지, Accept-Language 는 무시."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.territory_cards import sheets
+
+        member = get_user_model().objects.create_user(username="t", password="pw", name="홍길동", gender="d")
+        self.client.force_login(member)
+        for name, fn in {
+            "read_master_index": lambda: [],
+            "is_card_overview_cached": lambda sid: False,
+        }.items():
+            p = patch.object(sheets, name, side_effect=fn)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_default_is_korean_even_with_english_accept_language(self):
+        resp = self.client.get("/cards/", HTTP_ACCEPT_LANGUAGE="en-US,en;q=0.9")
+        self.assertContains(resp, "구역카드 목록")
+        self.assertNotContains(resp, "Territory Cards")
+        self.assertEqual(resp.headers["Content-Language"], "ko")
+
+    def test_lang_query_switches_and_sets_cookie(self):
+        from django.conf import settings
+
+        resp = self.client.get("/cards/?lang=en")
+        self.assertContains(resp, "Territory Cards")
+        self.assertContains(resp, 'lang="en"')
+        self.assertEqual(resp.cookies[settings.LANGUAGE_COOKIE_NAME].value, "en")
+        # 다음 요청은 쿼리 없이도 영어 유지
+        resp2 = self.client.get("/cards/")
+        self.assertContains(resp2, "Territory Cards")
+        self.assertEqual(resp2.headers["Content-Language"], "en")
+
+    def test_unknown_lang_is_ignored(self):
+        from django.conf import settings
+
+        resp = self.client.get("/cards/?lang=xx")
+        self.assertContains(resp, "구역카드 목록")
+        self.assertNotIn(settings.LANGUAGE_COOKIE_NAME, resp.cookies)
+
+    def test_switch_back_to_korean(self):
+        self.client.get("/cards/?lang=en")
+        resp = self.client.get("/cards/?lang=ko")
+        self.assertContains(resp, "구역카드 목록")
+
+
+class TranslationCatalogTests(TestCase):
+    """locale/en 카탈로그 완전성 — 빈 msgstr 이 있으면 영어 화면에 한국어가 섞인다."""
+
+    def _po_entries(self):
+        import re
+        from django.conf import settings
+
+        po = (settings.LOCALE_PATHS[0] / "en" / "LC_MESSAGES" / "django.po").read_text(encoding="utf-8")
+        entries = re.findall(
+            r'msgid ((?:"(?:[^"\\]|\\.)*"\s*)+)msgstr ((?:"(?:[^"\\]|\\.)*"\s*)+)', po
+        )
+        joined = []
+        for msgid, msgstr in entries:
+            j = lambda s: "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', s))
+            joined.append((j(msgid), j(msgstr)))
+        return joined
+
+    def test_every_msgid_translated(self):
+        entries = self._po_entries()
+        self.assertGreater(len(entries), 50)
+        empty = [msgid for msgid, msgstr in entries if msgid and not msgstr]
+        self.assertEqual(empty, [], f"번역 누락 {len(empty)}건: {empty[:5]}")
+
+    def test_compiled_catalog_is_loaded(self):
+        from django.utils import translation
+        from django.utils.translation import gettext
+
+        with translation.override("en"):
+            self.assertEqual(gettext("구역카드 목록"), "Territory Cards")
+        with translation.override("ko"):
+            self.assertEqual(gettext("구역카드 목록"), "구역카드 목록")
+
+    def test_placeholders_preserved(self):
+        """%(name)s 같은 자리표시자가 번역문에서 빠지면 렌더 시 KeyError/공백이 난다."""
+        import re
+
+        for msgid, msgstr in self._po_entries():
+            if not msgid:
+                continue
+            self.assertEqual(
+                sorted(re.findall(r"%\(\w+\)s", msgid)), sorted(re.findall(r"%\(\w+\)s", msgstr)),
+                f"자리표시자 불일치: {msgid!r} -> {msgstr!r}",
+            )
+
+
 class DeepCheckWarmTests(TestCase):
     """딥 체크의 봇 캐시 프리워밍 — 봇 활성 시에만, 판정과 무관."""
 
