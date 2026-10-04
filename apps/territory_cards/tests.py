@@ -10,7 +10,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from apps.messenger.services import link_account
 
 from . import mapping, sheets
-from .sheets import SheetsApiError, SheetRowMismatch
+from .sheets import SheetsApiError, SheetsConfigError, SheetRowMismatch
 from .user_views import _assignee_name
 
 
@@ -129,7 +129,7 @@ class SheetsApiErrorViewTests(TestCase):
         self.addCleanup(p.stop)
 
     def test_card_list_renders_transient_error_page(self):
-        self._patch("read_master_index", self.API_ERROR)
+        self._patch("list_cards", self.API_ERROR)
         res = self.client.get("/cards/")
         self.assertEqual(res.status_code, 503)
         self.assertContains(res, "일시적인 오류", status_code=503)
@@ -157,7 +157,7 @@ class SheetsApiErrorViewTests(TestCase):
         self.assertIn("잠시 후 다시 시도", res.json()["error"])
 
 
-class MetaCacheTests(SimpleTestCase):
+class MetaCacheTests(TestCase):  # list_cards 가 제외 목록(DB)을 읽으므로 TestCase
     """메타데이터 캐시 — TTL 내 재호출은 API 를 다시 부르지 않는다(오류는 캐시 안 됨)."""
 
     def setUp(self):
@@ -168,12 +168,13 @@ class MetaCacheTests(SimpleTestCase):
         p.start()
         self.addCleanup(p.stop)
 
-    @override_settings(TERRITORY_CARDS_MASTER_SHEET_ID="MASTER")
-    def test_master_index_cached(self):
-        resp = {"values": [["카드 (3cards)", "https://docs.google.com/spreadsheets/d/SID/edit#gid=0"]]}
-        with mock.patch.object(sheets, "execute", return_value=resp) as ex:
-            first = sheets.read_master_index()
-            second = sheets.read_master_index()
+    @override_settings(TERRITORY_CARDS_FOLDER_ID="FOLDER")
+    def test_folder_cards_cached(self):
+        resp = {"files": [{"id": "SID", "name": "카드 (3cards)"}]}
+        with mock.patch.object(sheets, "build_service", return_value=mock.Mock()), \
+                mock.patch.object(sheets, "execute", return_value=resp) as ex:
+            first = sheets.list_cards()
+            second = sheets.list_cards()
         self.assertEqual(ex.call_count, 1)  # 두 번째는 캐시
         self.assertEqual(first, second)
         self.assertEqual(first[0]["spreadsheet_id"], "SID")
@@ -1016,7 +1017,7 @@ class CardListWarmHintTests(TestCase):
              "spreadsheet_id": "COLD", "gid": 0},
         ]
         patches = {
-            "read_master_index": lambda: [dict(c) for c in cards],
+            "list_cards": lambda: [dict(c) for c in cards],
             "is_card_overview_cached": lambda sid: sid == "WARM",
         }
         for name, fn in patches.items():
@@ -1143,6 +1144,7 @@ class CardMapViewTests(TestCase):
             "read_card_overview": lambda spreadsheet_id: (
                 [dict(t) for t in self.TABS], {},
             ),
+            "is_territory_card": lambda spreadsheet_id: True,
         }
         for name, fn in patches.items():
             p = mock.patch.object(sheets, name, side_effect=fn)
@@ -1247,3 +1249,151 @@ class CardMapViewTests(TestCase):
         self.client.force_login(boss)
         res = self._get_map()
         self.assertEqual(res.status_code, 200)
+
+
+@override_settings(TERRITORY_CARDS_FOLDER_ID="FOLDER")
+class FolderCardsTests(TestCase):
+    """구역카드 목록 = 드라이브 폴더 최상위의 구글시트 — 이름순, 제외 목록 즉시 반영."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.drive = mock.Mock()
+        p = mock.patch.object(sheets, "build_service", return_value=self.drive)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def _patch_execute(self, *pages):
+        p = mock.patch.object(sheets, "execute", side_effect=list(pages))
+        ex = p.start()
+        self.addCleanup(p.stop)
+        return ex
+
+    def test_query_is_top_level_sheets_only(self):
+        self._patch_execute({"files": []})
+        sheets.list_cards()
+        q = self.drive.files.return_value.list.call_args.kwargs["q"]
+        self.assertIn("'FOLDER' in parents", q)
+        self.assertIn("trashed = false", q)
+        # 폴더·PDF 는 시트 MIME 조건으로 애초에 빠진다.
+        self.assertIn(f"mimeType = '{mapping.GOOGLE_SHEET_MIME}'", q)
+
+    def test_sorted_by_name_naturally(self):
+        self._patch_execute({"files": [
+            {"id": "C", "name": "区域10 (2cards)"},
+            {"id": "A", "name": "区域2 (5cards)"},
+            {"id": "B", "name": "区域09 (3cards)"},
+        ]})
+        cards = sheets.list_cards()
+        self.assertEqual([c["spreadsheet_id"] for c in cards], ["A", "B", "C"])
+        self.assertEqual([c["count"] for c in cards], [5, 3, 2])
+
+    def test_follows_pagination(self):
+        ex = self._patch_execute(
+            {"files": [{"id": "A", "name": "a"}], "nextPageToken": "T"},
+            {"files": [{"id": "B", "name": "b"}]},
+        )
+        cards = sheets.list_cards()
+        self.assertEqual([c["spreadsheet_id"] for c in cards], ["A", "B"])
+        self.assertEqual(ex.call_count, 2)
+        last = self.drive.files.return_value.list.call_args.kwargs
+        self.assertEqual(last["pageToken"], "T")
+
+    def test_excluded_file_hidden_immediately_despite_cache(self):
+        from .models import ExcludedCardFile
+
+        self._patch_execute({"files": [
+            {"id": "KEEP", "name": "구역 (1cards)"},
+            {"id": "DROP", "name": "삭제금지 목록"},
+        ]})
+        self.assertEqual(len(sheets.list_cards()), 2)
+        # 캐시가 살아 있어도 admin 의 제외 등록은 다음 읽기에 바로 반영된다.
+        ExcludedCardFile.objects.create(name="삭제금지 목록")
+        self.assertEqual([c["spreadsheet_id"] for c in sheets.list_cards()], ["KEEP"])
+        self.assertIsNone(sheets.get_card("DROP"))
+        self.assertIsNotNone(sheets.get_card("KEEP"))
+
+    @override_settings(TERRITORY_CARDS_FOLDER_ID="")
+    def test_missing_folder_setting_is_config_error(self):
+        with self.assertRaises(SheetsConfigError):
+            sheets.list_cards()
+
+
+class ExcludedCardFileTests(TestCase):
+    def test_seeded_appointment_list_is_excluded(self):
+        from .models import ExcludedCardFile
+
+        self.assertTrue(ExcludedCardFile.objects.filter(name="전자구역카드_임명리스트").exists())
+
+    def test_name_is_stripped(self):
+        from .models import ExcludedCardFile
+
+        self.assertEqual(ExcludedCardFile.objects.create(name="  목록 ").name, "목록")
+
+
+class TerritoryCardFormatGuardTests(TestCase):
+    """
+    '삭제금지' 탭이 없는 시트(제외 목록에 빠진 무관한 시트)는 구역카드로 취급하지 않는다 —
+    탭 목록은 안내 화면, 탭 경로는 전부 404, 특히 J2 쓰기가 일어나지 않아야 한다.
+    """
+
+    CARD = {"name": "전자구역카드_임명리스트", "spreadsheet_id": "SID", "count": None}
+    NOT_A_CARD_TABS = [
+        {"title": "임명", "index": 0, "gid": 0},
+        {"title": "메모", "index": 1, "gid": 111},
+    ]
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.member = get_user_model().objects.create_user(
+            username="tester", password="pw", name="홍길동", gender="d", is_staff=True
+        )
+        self.client.force_login(self.member)
+        self.mocks = {}
+        patches = {
+            "get_card": lambda spreadsheet_id: dict(self.CARD),
+            "list_tabs": lambda spreadsheet_id: [dict(t) for t in self.NOT_A_CARD_TABS],
+            "read_card_overview": None,
+            "read_card_rows": None,
+            "read_assignee": lambda spreadsheet_id, title: "",
+            "set_assignee": None,
+        }
+        for name, fn in patches.items():
+            p = mock.patch.object(sheets, name, side_effect=fn)
+            self.mocks[name] = p.start()
+            self.addCleanup(p.stop)
+
+    def test_signature_is_status_tab(self):
+        self.assertFalse(sheets.is_territory_card("SID"))
+        self.mocks["list_tabs"].side_effect = lambda sid: [
+            {"title": "1A", "index": 0, "gid": 0},
+            {"title": mapping.STATUS_LIST_TAB, "index": 1, "gid": 9},
+        ]
+        self.assertTrue(sheets.is_territory_card("SID"))
+        self.assertEqual(sheets.list_data_tabs("SID"), [{"title": "1A", "gid": 0}])
+
+    def test_non_card_has_no_data_tabs(self):
+        self.assertEqual(sheets.list_data_tabs("SID"), [])
+        self.assertIsNone(sheets.resolve_tab_title("SID", 0))
+
+    def test_tab_list_shows_notice_without_reading_body(self):
+        res = self.client.get("/cards/SID/")
+        self.assertContains(res, "구역카드 형식이 아닙니다", status_code=404)
+        self.assertContains(res, "구역카드 시트가 아닌 것 같습니다", status_code=404)
+        self.assertContains(res, "제외 목록 등록", status_code=404)
+        # 막다른 화면이 되지 않도록 구역카드 목록으로 돌아가는 버튼.
+        self.assertContains(res, 'href="/cards/"', status_code=404)
+        self.assertContains(res, "구역카드 목록으로 돌아가기", status_code=404)
+        self.mocks["read_card_overview"].assert_not_called()
+
+    def test_enter_tab_never_writes_assignee(self):
+        res = self.client.post("/cards/SID/0/enter/", {"confirm": "1", "assignee": "홍길동"})
+        self.assertEqual(res.status_code, 404)
+        self.mocks["set_assignee"].assert_not_called()
+
+    def test_card_map_shows_notice(self):
+        with self.settings(GOOGLE_MAPS_API_KEY="TESTKEY"):
+            res = self.client.get("/cards/SID/map/")
+        self.assertContains(res, "구역카드 형식이 아닙니다", status_code=404)
+        self.mocks["read_card_rows"].assert_not_called()

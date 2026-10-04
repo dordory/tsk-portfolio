@@ -5,7 +5,7 @@ territory_cards 봉사자 화면 (4화면 플로우 + 쓰기 액션).
 신원("누구인가")은 Member/MessengerAccount(DB), 구역 데이터는 시트 — 하이브리드.
 
 플로우:
-  ① card_list      : 마스터 인덱스 기반 구역카드 목록
+  ① card_list      : 구역카드 폴더(드라이브) 기반 구역카드 목록
   ② tab_list       : 실제 탭(구역) 목록 — 제목 표시, URL 은 gid(불변 ID)로 식별
   enter_tab (POST) : J2 담당자 확인/기록 후 ③ 으로 (경고 시 confirm 필요)
   release_tab(POST): J2 담당자 초기화(반납) 후 ② 로
@@ -17,6 +17,7 @@ territory_cards 봉사자 화면 (4화면 플로우 + 쓰기 액션).
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, Http404
 from django.shortcuts import render, redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.views.decorators.cache import never_cache
@@ -79,6 +80,21 @@ def _sheets_error_response(request, exc):
     )
 
 
+def _not_a_card_response(request, card):
+    """구역카드 형식이 아닌 시트(제외 목록에 빠진 무관한 시트)를 열었을 때의 안내 화면."""
+    return render(
+        request,
+        _tpl(request, "territory_cards/error.html"),
+        {
+            "title": _("구역카드 형식이 아닙니다"),
+            "message": _("'%(name)s' 는 구역카드 시트가 아닌 것 같습니다.") % {"name": card["name"]},
+            "hint": _("관리자에게 제외 목록 등록을 요청하세요."),
+            "back_url": reverse("territory_cards:card_list"),
+        },
+        status=404,
+    )
+
+
 # ─────────────────────────────────────────────────────────────
 # ① 시트(구역카드) 목록
 # ─────────────────────────────────────────────────────────────
@@ -86,13 +102,13 @@ def _sheets_error_response(request, exc):
 @never_cache
 def card_list(request):
     try:
-        cards = sheets.read_master_index()
+        cards = sheets.list_cards()
     except SHEETS_ERRORS as e:
         return _sheets_error_response(request, e)
 
     # 로딩 스피너 힌트: 탭 목록 캐시가 살아 있는 카드는 전환이 빠르므로 링크에
     # data-warm 을 심어 스피너를 생략한다(캐시 조회뿐 — API 호출 없음).
-    # read_master_index 의 반환값은 캐시 공유 객체라 복사본에 붙인다.
+    # list_cards 의 원소는 캐시 공유 객체라 복사본에 붙인다.
     cards = [
         {**card, "warm": sheets.is_card_overview_cached(card["spreadsheet_id"])}
         for card in cards
@@ -113,6 +129,8 @@ def tab_list(request, spreadsheet_id):
         card = sheets.get_card(spreadsheet_id)
         if card is None:
             raise Http404(_("해당 구역카드를 찾을 수 없습니다."))
+        if not sheets.is_territory_card(spreadsheet_id):
+            return _not_a_card_response(request, card)
         # 탭 목록 + 탭별 담당자(J2)·최근 방문일(타일 표시용)을 1왕복으로
         # (콜드 로드 단축 — read_card_overview 참고).
         tabs, summary = sheets.read_card_overview(spreadsheet_id)
@@ -395,6 +413,8 @@ def card_map(request, spreadsheet_id):
         card = sheets.get_card(spreadsheet_id)
         if card is None:
             raise Http404(_("해당 구역카드를 찾을 수 없습니다."))
+        if not sheets.is_territory_card(spreadsheet_id):
+            return _not_a_card_response(request, card)
         tabs = sheets.list_data_tabs(spreadsheet_id)
         rows_by_tab = sheets.read_card_rows(spreadsheet_id, tabs)
     except SHEETS_ERRORS as e:

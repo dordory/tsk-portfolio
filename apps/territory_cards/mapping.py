@@ -181,11 +181,19 @@ def data_row_range(end_row, start_row=DATA_ROW_START):
 
 
 # ─────────────────────────────────────────────────────────────
-# 마스터 인덱스 파싱
+# 구역카드 목록 파싱
 # ─────────────────────────────────────────────────────────────
+GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet"
 _NCARDS_RE = re.compile(r"(\d+)\s*cards", re.IGNORECASE)
-_SPREADSHEET_ID_RE = re.compile(r"/spreadsheets/d/([a-zA-Z0-9\-_]+)")
-_GID_RE = re.compile(r"[?#&]gid=(\d+)")
+_DIGITS_RE = re.compile(r"(\d+)")
+
+
+def natural_sort_key(name):
+    """이름 정렬 키 — 숫자 부분은 수치로 비교한다('区域2' < '区域10'), 대소문자 무시."""
+    return [
+        (0, int(part), "") if part.isdigit() else (1, 0, part.casefold())
+        for part in _DIGITS_RE.split(name or "") if part
+    ]
 
 
 def parse_card_count(card_name):
@@ -194,18 +202,6 @@ def parse_card_count(card_name):
     예: '区域09_サンプル会衆(10cards)' → 10. 패턴이 없으면 None.
     """
     m = _NCARDS_RE.search(card_name or "")
-    return int(m.group(1)) if m else None
-
-
-def parse_spreadsheet_id(url):
-    """시트 URL 에서 spreadsheetId 를 추출한다. 실패 시 None."""
-    m = _SPREADSHEET_ID_RE.search(url or "")
-    return m.group(1) if m else None
-
-
-def parse_gid(url):
-    """시트 URL 에서 gid(탭 식별자)를 추출한다. 없으면 None."""
-    m = _GID_RE.search(url or "")
     return int(m.group(1)) if m else None
 
 

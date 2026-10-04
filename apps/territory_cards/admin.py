@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import GeocodedAddress
+from .models import ExcludedCardFile, GeocodedAddress
 
 
 @admin.register(GeocodedAddress)
@@ -10,3 +10,12 @@ class GeocodedAddressAdmin(admin.ModelAdmin):
     list_display = ("query", "lat", "lng", "updated_at")
     search_fields = ("query",)
     ordering = ("-updated_at",)
+
+
+@admin.register(ExcludedCardFile)
+class ExcludedCardFileAdmin(admin.ModelAdmin):
+    """구역카드 폴더의 제외 목록 — 저장 즉시 카드 목록에 반영된다(캐시는 Drive 원본에만)."""
+
+    list_display = ("name", "created_at")
+    fields = ("name",)
+    search_fields = ("name",)

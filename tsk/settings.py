@@ -122,12 +122,13 @@ LOGIN_REDIRECT_URL = 'territory_cards:card_list'
 # 시크릿은 코드에 두지 말고 .env 로 주입한다.
 #   GOOGLE_SERVICE_ACCOUNT_FILE : 서비스계정 키 JSON 파일 경로, 또는
 #   GOOGLE_SERVICE_ACCOUNT_JSON : 키 JSON 문자열 그 자체(파일 경로 대신)
-#   TERRITORY_CARDS_MASTER_SHEET_ID : 마스터 인덱스("시트리스트_시트")의 spreadsheetId
-# 대상 시트들은 서비스 계정 이메일에 미리 "공유"해두어야 한다.
+#   TERRITORY_CARDS_FOLDER_ID : 구역카드 시트들이 든 구글드라이브 폴더의 folderId
+#     (최상위의 구글시트만 카드로 읽는다. 구역카드가 아닌 시트는 admin 의 제외 목록으로)
+# 폴더를 서비스 계정 이메일에 '편집자'로 "공유"해두어야 한다(안의 시트는 권한 상속).
 # ─────────────────────────────────────────────────────────────
 GOOGLE_SERVICE_ACCOUNT_FILE = env('GOOGLE_SERVICE_ACCOUNT_FILE', default='')
 GOOGLE_SERVICE_ACCOUNT_JSON = env('GOOGLE_SERVICE_ACCOUNT_JSON', default='')
-TERRITORY_CARDS_MASTER_SHEET_ID = env('TERRITORY_CARDS_MASTER_SHEET_ID', default='')
+TERRITORY_CARDS_FOLDER_ID = env('TERRITORY_CARDS_FOLDER_ID', default='')
 
 # 구역 전체 지도(주소 일괄 표시)용 Google Maps JavaScript API 키.
 # 브라우저에 노출되는 키이므로 GCP 콘솔에서 HTTP 리퍼러 제한 필수.

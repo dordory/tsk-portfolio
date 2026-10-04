@@ -452,6 +452,19 @@ msgstr "Temporary error"
 msgid "잠시 후 다시 시도해 주세요."
 msgstr "Please try again shortly."
 
+#: apps/territory_cards/user_views.py:88
+msgid "구역카드 형식이 아닙니다"
+msgstr "Not a territory card"
+
+#: apps/territory_cards/user_views.py:89
+#, python-format
+msgid "'%(name)s' 는 구역카드 시트가 아닌 것 같습니다."
+msgstr "'%(name)s' does not appear to be a territory card sheet."
+
+#: apps/territory_cards/user_views.py:91
+msgid "관리자에게 제외 목록 등록을 요청하세요."
+msgstr "Please ask an administrator to add it to the exclusion list."
+
 #: apps/territory_cards/user_views.py:115
 #: apps/territory_cards/user_views.py:397
 msgid "해당 구역카드를 찾을 수 없습니다."

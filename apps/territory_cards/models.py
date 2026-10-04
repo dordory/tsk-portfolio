@@ -1,5 +1,5 @@
 """
-territory_cards 의 유일한 모델 — 지오코딩 좌표 캐시.
+territory_cards 의 모델 — 지오코딩 좌표 캐시 + 구역카드 폴더의 제외 목록.
 
 구역 데이터의 소스는 여전히 100% 구글시트다(하이브리드 원칙 불변).
 좌표는 사람이 시트에서 보거나 편집할 일이 없는 '앱 내부 파생 캐시'라 시트가 아니라
@@ -33,3 +33,32 @@ class GeocodedAddress(models.Model):
 
     def __str__(self):
         return f"{self.query} ({self.lat}, {self.lng})"
+
+
+class ExcludedCardFile(models.Model):
+    """
+    구역카드 폴더 안에 있지만 카드 목록에서 뺄 구글시트(구역카드가 아닌 시트).
+    폴더·PDF 등 시트가 아닌 파일은 Drive 쿼리에서 자동 제외되므로 여기엔 시트만 둔다.
+
+    키는 파일 이름 — 시스템을 모르는 운영자도 드라이브에 보이는 이름만으로 등록할 수
+    있게(ID/URL 취득 불요). 드라이브의 파일 이름과 정확히 일치(앞뒤 공백 무시)하면
+    제외하며, 파일을 개명하면 제외가 풀리므로 여기 이름도 함께 고친다.
+    """
+
+    name = models.CharField(
+        "파일 이름", max_length=200, unique=True,
+        help_text="드라이브에 보이는 파일 이름 그대로(정확히 일치하면 제외 — 파일을 개명하면 여기도 고쳐 주세요).",
+    )
+    created_at = models.DateTimeField("등록일시", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "구역카드 제외 파일"
+        verbose_name_plural = "구역카드 제외 파일"
+        ordering = ("name",)
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        self.name = (self.name or "").strip()
+        super().save(*args, **kwargs)

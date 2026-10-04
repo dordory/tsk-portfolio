@@ -8,7 +8,8 @@ Google Sheets 접근 계층 (서비스 계정, Sheets API v4).
   서비스 계정 자격증명으로 인증한다. 키는 코드에 두지 않고 환경변수로 주입한다.
     - GOOGLE_SERVICE_ACCOUNT_FILE : 서비스계정 키 JSON 파일 경로, 또는
     - GOOGLE_SERVICE_ACCOUNT_JSON : 키 JSON 문자열 그 자체
-  대상 시트들을 서비스 계정 이메일에 미리 "공유"해두어야 한다(운영 준비 항목).
+  구역카드 폴더(TERRITORY_CARDS_FOLDER_ID)를 서비스 계정 이메일에 '편집자'로
+  공유해두어야 한다(운영 준비 항목 — 폴더 안 시트들은 권한을 물려받는다).
 
 행 개수 가변:
   탭마다 데이터 행 수가 다르다(중간에 행이 삽입되어 아래로 밀림). 열은 고정.
@@ -38,7 +39,7 @@ logger = logging.getLogger(__name__)
 # 프리페치는 없고, 아무도 안 보는 시트/탭은 캐시에 존재하지 않는다.
 #
 # 두 계층으로 나뉜다:
-#  - 메타데이터(마스터 인덱스/탭 목록/상태값): 자주 안 바뀜 → META_CACHE_TTL(5분).
+#  - 메타데이터(구역카드 폴더 목록/탭 목록/상태값): 자주 안 바뀜 → META_CACHE_TTL(5분).
 #    시트 쪽 변경(카드 추가, 탭 이름변경/재배열)은 최대 TTL 만큼 늦게 반영되고,
 #    탭 이름이 바뀐 직후엔 옛 제목으로 접근해 일시 오류가 날 수 있지만 자가 회복된다.
 #  - 구역 본문(read_tab_rows / read_tabs_summary): BODY_CACHE_TTL(60초).
@@ -100,7 +101,7 @@ SCOPES = [
 
 
 class SheetsConfigError(Exception):
-    """서비스 계정/마스터 시트 설정 누락."""
+    """서비스 계정/구역카드 폴더 설정 누락."""
 
 
 class SheetsApiError(Exception):
@@ -312,60 +313,86 @@ def _a1(title, rng):
 
 
 # ─────────────────────────────────────────────────────────────
-# 마스터 인덱스
+# 구역카드 목록 (구글드라이브 폴더)
 # ─────────────────────────────────────────────────────────────
-def read_master_index():
+# 카드 목록의 소스는 구역카드 폴더(TERRITORY_CARDS_FOLDER_ID) 최상위의 구글시트들이다
+# (하위 폴더는 읽지 않음). 폴더·PDF 등 시트가 아닌 파일은 Drive 쿼리의 mimeType
+# 조건으로 애초에 빠지고, 구역카드가 아닌 구글시트는 admin 의 제외 목록
+# (models.ExcludedCardFile — 파일 이름 일치)로 거른다. 새 카드는 폴더에 넣기만 하면 나타난다
+# (폴더를 서비스 계정에 '편집자'로 공유 — 폴더 안 시트는 권한을 물려받는다).
+#
+# 캐시는 Drive 목록 원본에만 건다(META_CACHE_TTL). 제외 필터는 읽을 때마다 DB 에서
+# 적용하므로 admin 에서 제외 목록을 고치면 즉시 반영된다.
+def list_cards():
     """
-    마스터 인덱스 시트(시트리스트_시트)의 A2:B 를 읽어 구역카드 목록을 반환한다.
-    META_CACHE_TTL 동안 캐시된다(모든 화면의 get_card 가 이걸 재독하므로 효과 큼).
+    구역카드 목록을 이름순(숫자는 자연 정렬)으로 반환한다.
 
-    반환: [{name, url, count, spreadsheet_id, gid}, ...]
+    반환: [{name, spreadsheet_id, count}, ...]
       - count: 이름의 (Ncards) 에서 파싱한 탭 개수 (없으면 None)
     """
-    return _cached("tcards:master_index", _fetch_master_index)
+    from .models import ExcludedCardFile  # 지연 import — 앱 로딩 순서 무관하게
+
+    excluded = set(ExcludedCardFile.objects.values_list("name", flat=True))
+    return [
+        card for card in _cached("tcards:folder_cards", _fetch_folder_cards)
+        if card["name"] not in excluded
+    ]
 
 
-def _fetch_master_index():
-    spreadsheet_id = getattr(settings, "TERRITORY_CARDS_MASTER_SHEET_ID", "") or ""
-    if not spreadsheet_id:
-        raise SheetsConfigError("TERRITORY_CARDS_MASTER_SHEET_ID 가 설정되지 않았습니다.")
+def _fetch_folder_cards():
+    folder_id = getattr(settings, "TERRITORY_CARDS_FOLDER_ID", "") or ""
+    if not folder_id:
+        raise SheetsConfigError("TERRITORY_CARDS_FOLDER_ID 가 설정되지 않았습니다.")
 
-    service = get_service()
-    resp = execute(
-        service.spreadsheets()
-        .values()
-        .get(spreadsheetId=spreadsheet_id, range="A2:B")
+    service = build_service("drive", "v3")
+    query = (
+        f"'{folder_id}' in parents and trashed = false"
+        f" and mimeType = '{mapping.GOOGLE_SHEET_MIME}'"
     )
-    rows = resp.get("values", [])
-    cards = []
-    for row in rows:
-        name = (row[0] if len(row) > 0 else "").strip()
-        url = (row[1] if len(row) > 1 else "").strip()
-        if not name or not url:
-            continue
-        cards.append({
-            "name": name,
-            "url": url,
-            "count": mapping.parse_card_count(name),
-            "spreadsheet_id": mapping.parse_spreadsheet_id(url),
-            "gid": mapping.parse_gid(url),
-        })
+    files, page_token = [], None
+    while True:
+        resp = execute(
+            service.files().list(
+                q=query,
+                pageSize=1000,
+                pageToken=page_token,
+                fields="nextPageToken, files(id,name)",
+                # 공유 드라이브에 있는 폴더여도 동작하도록(내 드라이브면 무해).
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+            )
+        )
+        files.extend(resp.get("files", []))
+        page_token = resp.get("nextPageToken")
+        if not page_token:
+            break
+
+    cards = [
+        {
+            "name": f["name"].strip(),
+            "spreadsheet_id": f["id"],
+            "count": mapping.parse_card_count(f["name"]),
+        }
+        for f in files
+        if f.get("id") and (f.get("name") or "").strip()
+    ]
+    cards.sort(key=lambda c: mapping.natural_sort_key(c["name"]))
     return cards
 
 
 def ping():
     """
-    딥 헬스체크용: 마스터 인덱스를 '캐시 우회'로 1회 읽는다(성공하면 조용히 반환,
-    실패는 예외 그대로). 메타 캐시를 타면 공유 해제 같은 장애가 TTL 동안 가려지므로
-    반드시 실제 API 왕복이 일어나는 경로를 쓴다. 자격증명·시트 공유·쿼터·네트워크가
-    한 번에 검증된다.
+    딥 헬스체크용: 구역카드 폴더 목록을 '캐시 우회'로 1회 읽는다(성공하면 조용히
+    반환, 실패는 예외 그대로). 메타 캐시를 타면 공유 해제 같은 장애가 TTL 동안
+    가려지므로 반드시 실제 API 왕복이 일어나는 경로를 쓴다. 자격증명·폴더 공유·
+    쿼터·네트워크가 한 번에 검증된다.
     """
-    _fetch_master_index()
+    _fetch_folder_cards()
 
 
 def get_card(spreadsheet_id):
-    """마스터 인덱스에서 spreadsheet_id 로 카드 1건을 찾는다(없으면 None)."""
-    for card in read_master_index():
+    """구역카드 목록에서 spreadsheet_id 로 카드 1건을 찾는다(없거나 제외면 None)."""
+    for card in list_cards():
         if card["spreadsheet_id"] == spreadsheet_id:
             return card
     return None
@@ -408,8 +435,26 @@ def _fetch_tabs(spreadsheet_id):
     return tabs
 
 
+def is_territory_card(spreadsheet_id):
+    """
+    구역카드 형식의 시트인지 — 상태값 탭('삭제금지')이 있으면 구역카드로 인정한다.
+
+    카드 목록은 드라이브 폴더의 시트 전부라, 제외 목록에 빠진 무관한 시트(임명 리스트
+    등)가 섞여 들어올 수 있다. 그런 시트를 구역으로 취급해 J2 에 이름을 쓰는 사고를
+    막는 안전장치 — 제외 목록은 '안 보이게 하는 편의', 이 판정은 '쓰기 방지'를 맡는다.
+    list_tabs(1시간 캐시)만 보므로 API 호출이 늘지 않는다.
+    """
+    return any(t["title"] == mapping.STATUS_LIST_TAB for t in list_tabs(spreadsheet_id))
+
+
 def list_data_tabs(spreadsheet_id):
-    """데이터 탭만(특수 탭 제외) 시트 순서대로. 반환: [{title, gid}]."""
+    """
+    데이터 탭만(특수 탭 제외) 시트 순서대로. 반환: [{title, gid}].
+    구역카드 형식이 아닌 시트(is_territory_card 거짓)는 빈 목록 — resolve_tab_title 이
+    None 이 되어 탭 진입·반납·비고·방문기록 등 모든 탭 경로가 404 로 막힌다.
+    """
+    if not is_territory_card(spreadsheet_id):
+        return []
     data_tabs = [
         t for t in list_tabs(spreadsheet_id)
         if t["title"] not in _SPECIAL_TABS

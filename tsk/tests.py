@@ -105,7 +105,7 @@ class LanguageMiddlewareTests(TestCase):
         member = get_user_model().objects.create_user(username="t", password="pw", name="홍길동", gender="d")
         self.client.force_login(member)
         for name, fn in {
-            "read_master_index": lambda: [],
+            "list_cards": lambda: [],
             "is_card_overview_cached": lambda sid: False,
         }.items():
             p = patch.object(sheets, name, side_effect=fn)
